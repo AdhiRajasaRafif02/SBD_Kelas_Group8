@@ -51,7 +51,7 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      user: { id: user._id, username: user.username, email: user.email },
+      user: { id: user._id, username: user.username, email: user.email, role: user.role },
     });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -164,5 +164,30 @@ exports.updateProfile = async (req, res) => {
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+exports.verifySession = async (req, res) => {
+  try {
+    // Jika req.user ada, berarti middleware auth sudah memverifikasi session
+    if (req.user) {
+      return res.status(200).json({
+        isAuthenticated: true,
+        user: {
+          id: req.user._id,
+          username: req.user.username,
+          email: req.user.email,
+          role: req.user.role,
+        },
+      });
+    }
+
+    // Jika tidak ada session
+    return res.status(401).json({
+      isAuthenticated: false,
+      message: "Session not valid or expired",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
   }
 };

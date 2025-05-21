@@ -28,22 +28,22 @@ const Landing = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-800 to-blue-700 opacity-80"></div>
         </div>
         <nav className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex justify-between items-center py-4 md:py-6">
             <div>
-              <span className="text-white font-bold text-xl">
+              <span className="text-white font-bold text-xl md:text-2xl">
                 Course<span className="text-blue-300">Eight</span>
               </span>
             </div>
-            <div className="flex space-x-4">
+            <div className="flex space-x-2 md:space-x-4">
               <Link
                 to="/login"
-                className="text-white hover:text-blue-200 px-3 py-2 text-sm font-medium"
+                className="text-white hover:text-blue-200 px-2 py-1 md:px-3 md:py-2 text-sm font-medium"
               >
                 Login
               </Link>
               <Link
                 to="/register"
-                className="bg-white text-indigo-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium"
+                className="bg-white text-indigo-600 hover:bg-blue-50 px-3 py-1 md:px-4 md:py-2 rounded-md text-sm font-medium"
               >
                 Sign Up
               </Link>
@@ -51,23 +51,23 @@ const Landing = () => {
           </div>
         </nav>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 lg:py-32">
           <div className="lg:grid lg:grid-cols-12 lg:gap-8">
             <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left">
-              <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">
+              <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl">
                 Learn and Grow with{" "}
                 <span className="text-blue-300">Course</span>Eight
               </h1>
-              <p className="mt-6 text-xl text-blue-100">
+              <p className="mt-4 md:mt-6 text-base md:text-xl text-blue-100">
                 Your path to success starts here. Discover courses taught by
                 industry experts and unlock your potential with hands-on
                 assessments.
               </p>
-              <div className="mt-10 sm:flex sm:justify-center lg:justify-start">
+              <div className="mt-6 md:mt-10 sm:flex sm:justify-center lg:justify-start">
                 <div className="rounded-md shadow">
                   <Link
                     to="/register"
-                    className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-white hover:bg-blue-50 md:py-4 md:text-lg md:px-10"
+                    className="w-full flex items-center justify-center px-6 py-2 md:px-8 md:py-3 border border-transparent text-base font-medium rounded-md text-indigo-700 bg-white hover:bg-blue-50 md:text-lg"
                   >
                     Get Started
                   </Link>
@@ -75,7 +75,7 @@ const Landing = () => {
                 <div className="mt-3 sm:mt-0 sm:ml-3">
                   <Link
                     to="/courses"
-                    className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-800 bg-opacity-60 hover:bg-opacity-70 md:py-4 md:text-lg md:px-10"
+                    className="w-full flex items-center justify-center px-6 py-2 md:px-8 md:py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-800 bg-opacity-60 hover:bg-opacity-70 md:text-lg"
                   >
                     Explore Courses
                   </Link>

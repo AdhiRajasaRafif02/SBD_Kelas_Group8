@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { assessmentAPI } from "../Services/api";
-import { FiClock, FiAlertTriangle } from "react-icons/fi";
+import { assessmentAPI, progressAPI } from "../Services/serviceApi";
+import { FiClock, FiAlertTriangle, FiArrowLeft } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const AssessmentDetail = () => {
@@ -10,46 +10,67 @@ const AssessmentDetail = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const [assessment, setAssessment] = useState(null);
-  const [answers, setAnswers] = useState([]);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   useEffect(() => {
-    const fetchAssessment = async () => {
+    const fetchAssessmentData = async () => {
       try {
         setLoading(true);
+
+        // Fetch assessment data
         const data = await assessmentAPI.getAssessmentById(id);
         setAssessment(data);
 
-        // Initialize answers array with empty values
-        setAnswers(new Array(data.questions.length).fill(""));
-
-        // Set time limit in seconds
+        // Initialize time limit
         if (data.timeLimit) {
-          setTimeLeft(data.timeLimit * 60);
+          setTimeLeft(data.timeLimit * 60); // Convert to seconds
+        }
+
+        // Initialize answers
+        if (data.questions) {
+          const initialAnswers = {};
+          data.questions.forEach((q) => {
+            initialAnswers[q._id] = "";
+          });
+          setAnswers(initialAnswers);
+        }
+
+        // Check if user has already submitted this assessment
+        if (data.results) {
+          const userSubmission = data.results.find(
+            (result) => result.userId === user.id
+          );
+          if (userSubmission) {
+            setHasSubmitted(true);
+            // Redirect to results if already submitted
+            toast.error("You have already submitted this assessment");
+            navigate(`/assessments/result/${id}`);
+          }
         }
       } catch (error) {
-        console.error("Error fetching assessment:", error);
+        console.error("Error fetching assessment details:", error);
         toast.error("Failed to load assessment");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAssessment();
-  }, [id]);
+    fetchAssessmentData();
+  }, [id, user.id, navigate]);
 
-  // Timer effect
+  // Timer countdown effect
   useEffect(() => {
-    if (timeLeft === null) return;
+    if (timeLeft <= 0 || !assessment) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmit(true);
+          handleAutoSubmit();
           return 0;
         }
         return prev - 1;
@@ -57,46 +78,68 @@ const AssessmentDetail = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, assessment]);
 
-  // Handle answer selection
-  const handleAnswerSelect = (answer) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQuestion] = answer;
-    setAnswers(newAnswers);
-  };
-
-  // Move to next or previous question
-  const handleNextQuestion = () => {
-    if (currentQuestion < assessment.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+  const handleAutoSubmit = () => {
+    if (!submitting) {
+      toast.error("Time's up! Your assessment is being submitted.");
+      handleSubmit();
     }
   };
 
-  const handlePrevQuestion = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
-    }
+  const handleAnswerChange = (questionId, value) => {
+    setAnswers({ ...answers, [questionId]: value });
   };
 
-  // Submit assessment
-  const handleSubmit = async (isTimeout = false) => {
-    if (
-      !isTimeout &&
-      !confirm("Are you sure you want to submit this assessment?")
-    ) {
+  const handleSubmit = async () => {
+    if (hasSubmitted) {
+      toast.error("You have already submitted this assessment");
       return;
+    }
+
+    if (submitting) return;
+
+    // Check if all questions are answered
+    const unansweredCount = Object.values(answers).filter(
+      (a) => a === ""
+    ).length;
+    if (unansweredCount > 0) {
+      const confirmSubmit = window.confirm(
+        `You have ${unansweredCount} unanswered question(s). Submit anyway?`
+      );
+      if (!confirmSubmit) return;
     }
 
     try {
       setSubmitting(true);
-      const result = await assessmentAPI.submitAssessment(id, answers);
-      toast.success(
-        isTimeout
-          ? "Time's up! Assessment submitted automatically."
-          : "Assessment submitted successfully!"
+
+      // Format answer data
+      const answerData = Object.entries(answers).map(
+        ([questionId, answer]) => ({
+          questionId,
+          answer,
+        })
       );
-      navigate(`/assessments/result/${id}`, { state: { result } });
+
+      // Submit assessment
+      const result = await assessmentAPI.submitAssessment(id, {
+        answers: answerData,
+      });
+
+      // Update progress for the course
+      if (assessment.courseId) {
+        try {
+          await progressAPI.updateUserProgress(user.id, assessment.courseId);
+        } catch (err) {
+          console.error("Error updating progress:", err);
+        }
+      }
+
+      // Mark as submitted to prevent double submission
+      setHasSubmitted(true);
+
+      // Navigate to results
+      navigate(`/assessments/result/${id}`);
     } catch (error) {
       console.error("Error submitting assessment:", error);
       toast.error("Failed to submit assessment");
@@ -105,11 +148,13 @@ const AssessmentDetail = () => {
     }
   };
 
-  // Format time
+  // Format timer display
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   if (loading) {
@@ -122,18 +167,18 @@ const AssessmentDetail = () => {
 
   if (!assessment) {
     return (
-      <div className="text-center p-8">
-        <FiAlertTriangle className="mx-auto h-12 w-12 text-yellow-500" />
-        <h2 className="mt-4 text-xl font-medium text-gray-900">
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-gray-900">
           Assessment not found
         </h2>
-        <p className="mt-2 text-gray-500">
-          The assessment you're looking for doesn't exist or has been removed.
+        <p className="mt-2 text-gray-600">
+          The assessment you're looking for doesn't exist.
         </p>
       </div>
     );
   }
 
+  // Get the current question
   const question = assessment.questions[currentQuestion];
 
   return (
@@ -149,7 +194,7 @@ const AssessmentDetail = () => {
             </div>
           </div>
           <p className="text-indigo-200 text-sm mt-1">
-            Course: {assessment.courseName}
+            Course: {course?.title || "Course Assessment"}
           </p>
         </div>
 
@@ -171,53 +216,67 @@ const AssessmentDetail = () => {
             <span>
               Question {currentQuestion + 1} of {assessment.questions.length}
             </span>
-            {question.type === "multiple-choice" && (
-              <span>{answers[question.id] ? "Answered" : "Not answered"}</span>
-            )}
+            <span>
+              {answers[currentQuestion] ? "Answered" : "Not answered"}
+            </span>
           </div>
 
           <h2 className="text-lg font-medium text-gray-900 mb-6">
-            {question.text}
+            {question?.text ||
+              question?.question ||
+              "No question text available"}
           </h2>
 
-          {question.type === "multiple-choice" && (
-            <div className="space-y-4">
-              {question.options.map((option) => (
-                <label
-                  key={option.id}
-                  className={`block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                    answers[question.id] === option.id
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      name={`question-${question.id}`}
-                      value={option.id}
-                      checked={answers[question.id] === option.id}
-                      onChange={() =>
-                        handleAnswerChange(question.id, option.id)
-                      }
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
-                    />
-                    <span className="ml-3 text-gray-700">{option.text}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
+          {/* Multiple choice question */}
+          {question?.type === "multiple-choice" &&
+            question?.options?.length > 0 && (
+              <div className="space-y-4">
+                {question.options.map((option, optionIndex) => (
+                  <label
+                    key={optionIndex}
+                    className={`block p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition ${
+                      answers[currentQuestion] === optionIndex.toString()
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        name={`question-${currentQuestion}`}
+                        value={optionIndex.toString()}
+                        checked={
+                          answers[currentQuestion] === optionIndex.toString()
+                        }
+                        onChange={() =>
+                          handleAnswerChange(
+                            currentQuestion,
+                            optionIndex.toString()
+                          )
+                        }
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                      />
+                      <span className="ml-3 text-gray-700">
+                        {option.text || option || `Option ${optionIndex + 1}`}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
 
-          {question.type === "text" && (
+          {/* Text/essay question */}
+          {(!question?.type ||
+            question?.type === "text" ||
+            question?.type === "essay") && (
             <div>
               <textarea
                 rows="6"
                 className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Type your answer here..."
-                value={answers[question.id] || ""}
+                value={answers[currentQuestion] || ""}
                 onChange={(e) =>
-                  handleAnswerChange(question.id, e.target.value)
+                  handleAnswerChange(currentQuestion, e.target.value)
                 }
               ></textarea>
             </div>
@@ -242,12 +301,12 @@ const AssessmentDetail = () => {
             {currentQuestion === assessment.questions.length - 1 ? (
               <button
                 onClick={() => handleSubmit()}
-                disabled={isSubmitting}
+                disabled={submitting}
                 className={`px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                  isSubmitting ? "opacity-70 cursor-not-allowed" : ""
+                  submitting ? "opacity-70 cursor-not-allowed" : ""
                 }`}
               >
-                {isSubmitting ? "Submitting..." : "Submit Assessment"}
+                {submitting ? "Submitting..." : "Submit Assessment"}
               </button>
             ) : (
               <button

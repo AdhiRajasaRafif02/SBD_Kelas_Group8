@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { courseAPI, progressAPI } from "../Services/api";
+import { courseAPI, progressAPI, assessmentAPI } from "../Services/serviceApi";
 import {
   FiUsers,
   FiCalendar,
@@ -9,18 +9,23 @@ import {
   FiBookOpen,
   FiCheck,
   FiLock,
+  FiAward,
+  FiTrendingUp,
+  FiStar,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const CourseDetail = () => {
   const { id } = useParams();
   const { user } = useContext(AuthContext);
+  const location = useLocation();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [progress, setProgress] = useState(0);
+  const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -28,6 +33,67 @@ const CourseDetail = () => {
         setLoading(true);
         const courseData = await courseAPI.getCourseById(id);
         setCourse(courseData);
+
+        console.log("Course data:", courseData);
+        console.log("Course ID:", courseData.id);
+
+        // Jika course memiliki array assessments, fetch detail untuk setiap assessment
+        if (courseData.assessments && courseData.assessments.length > 0) {
+          console.log(
+            `Course has ${courseData.assessments.length} assessments, fetching details...`
+          );
+
+          // Kasus 1: Jika assessments hanya berisi ID
+          if (
+            typeof courseData.assessments[0] === "string" ||
+            courseData.assessments[0]._id
+          ) {
+            const assessmentDetails = await Promise.all(
+              courseData.assessments.map((assessmentId) => {
+                const idToUse =
+                  typeof assessmentId === "string"
+                    ? assessmentId
+                    : assessmentId._id;
+                return assessmentAPI.getAssessmentById(idToUse);
+              })
+            );
+
+            console.log("Fetched assessment details:", assessmentDetails);
+            setCourse((prev) => ({
+              ...prev,
+              assessmentObjects: assessmentDetails,
+            }));
+          }
+          // Kasus 2: Jika assessments sudah berisi objek lengkap dari backend populate
+          else {
+            setCourse((prev) => ({
+              ...prev,
+              assessmentObjects: courseData.assessments,
+            }));
+          }
+        } else {
+          // Alternatif: Jika course tidak memiliki assessments array, coba cari berdasarkan courseId
+          try {
+            console.log("Trying to find assessments by courseId...");
+            const assessmentsByCourseLookup =
+              await assessmentAPI.getAssessmentsByCourse(id);
+
+            if (
+              assessmentsByCourseLookup &&
+              assessmentsByCourseLookup.length > 0
+            ) {
+              console.log(
+                `Found ${assessmentsByCourseLookup.length} assessments by courseId lookup`
+              );
+              setCourse((prev) => ({
+                ...prev,
+                assessmentObjects: assessmentsByCourseLookup,
+              }));
+            }
+          } catch (err) {
+            console.error("Error fetching assessments by courseId:", err);
+          }
+        }
 
         // Check if user is enrolled in this course
         if (user && courseData.students) {
@@ -46,16 +112,32 @@ const CourseDetail = () => {
             }
           }
         }
-      } catch (err) {
+      } catch (error) {
+        console.error("Error fetching course:", error);
         toast.error("Failed to load course details");
-        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchCourseDetails();
-  }, [id, user]);
+  }, [id, user, location.state]);
+
+  useEffect(() => {
+    const fetchLeaderboardData = async () => {
+      if (isEnrolled && user) {
+        try {
+          const leaderboardData = await progressAPI.getCourseRanking(id);
+          setLeaderboard(leaderboardData || []);
+        } catch (err) {
+          console.error("Error fetching leaderboard:", err);
+          setLeaderboard([]);
+        }
+      }
+    };
+
+    fetchLeaderboardData();
+  }, [isEnrolled, user, id]);
 
   const handleEnroll = async () => {
     try {
@@ -208,6 +290,16 @@ const CourseDetail = () => {
             >
               Discussions
             </button>
+            <button
+              onClick={() => setActiveTab("leaderboard")}
+              className={`px-6 py-3 text-sm font-medium ${
+                activeTab === "leaderboard"
+                  ? "border-b-2 border-indigo-500 text-indigo-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Leaderboard
+            </button>
           </nav>
         </div>
       </div>
@@ -319,10 +411,13 @@ const CourseDetail = () => {
           <div className="p-6">
             <h2 className="text-lg font-medium text-gray-900">Assessments</h2>
 
-            {course.assessments?.length > 0 ? (
+            {course.assessmentObjects?.length > 0 ? (
               <div className="mt-4 space-y-4">
-                {course.assessments.map((assessment, index) => (
-                  <div key={index} className="border rounded-md p-4">
+                {course.assessmentObjects.map((assessment, index) => (
+                  <div
+                    key={assessment._id || index}
+                    className="border rounded-md p-4"
+                  >
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-medium text-gray-900">
                         {assessment.title}
@@ -389,6 +484,134 @@ const CourseDetail = () => {
               <p className="mt-4 text-gray-600">
                 Enroll in this course to participate in discussions.
               </p>
+            )}
+          </div>
+        )}
+
+        {activeTab === "leaderboard" && (
+          <div className="p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-6">
+              Course Leaderboard
+            </h2>
+
+            {!isEnrolled ? (
+              <div className="text-center py-8">
+                <FiAward className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  Leaderboard Locked
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Enroll in this course to see the leaderboard
+                </p>
+              </div>
+            ) : leaderboard.length === 0 ? (
+              <div className="text-center py-8">
+                <FiTrendingUp className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">
+                  No data yet
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Complete assessments to appear on the leaderboard
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Rank
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Progress
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Score
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {leaderboard.map((entry, index) => (
+                      <tr
+                        key={entry.userId?._id || index}
+                        className={
+                          entry.userId?._id === user.id ? "bg-indigo-50" : ""
+                        }
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {index < 3 ? (
+                              <span
+                                className={`flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center 
+                        ${
+                          index === 0
+                            ? "bg-yellow-100 text-yellow-600"
+                            : index === 1
+                            ? "bg-gray-100 text-gray-600"
+                            : "bg-orange-100 text-orange-600"
+                        }`}
+                              >
+                                <FiAward />
+                              </span>
+                            ) : (
+                              <span className="text-sm font-medium text-gray-900 pl-1.5">
+                                {index + 1}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">
+                              {entry.userId?.username
+                                ?.charAt(0)
+                                ?.toUpperCase() || "?"}
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm font-medium text-gray-900">
+                                {entry.userId?.username || "Anonymous"}
+                                {entry.userId?._id === user.id && " (You)"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-24 bg-gray-200 rounded-full h-2.5">
+                              <div
+                                className={`h-2.5 rounded-full ${
+                                  entry.progressPercentage > 75
+                                    ? "bg-green-500"
+                                    : entry.progressPercentage > 40
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
+                                }`}
+                                style={{
+                                  width: `${entry.progressPercentage || 0}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <span className="ml-3 text-sm text-gray-500">
+                              {entry.progressPercentage || 0}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <FiStar className="mr-1 text-yellow-400" />
+                            <span className="text-sm font-medium text-gray-900">
+                              {Math.round(entry.averageScore || 0)}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

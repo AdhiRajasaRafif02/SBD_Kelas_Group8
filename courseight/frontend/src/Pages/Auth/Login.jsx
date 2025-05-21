@@ -10,13 +10,14 @@ const Login = () => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login } = useContext(AuthContext);
+  // Get both login function and user from context
+  const { login, user } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
 
   // Get the redirect path from location state or default to dashboard
   const from = location.state?.from?.pathname || "/dashboard";
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -30,21 +31,55 @@ const Login = () => {
       setIsLoading(true);
       const response = await login(email, password);
       toast.success("Login successful!");
-      navigate(from, { replace: true });
+
+      console.log("Login response in component:", response);
+
+      // Use the userData from the login response
+      const userData = response.user;
+      console.log("User data for navigation:", userData);
+      console.log("User role:", userData?.role);
+      console.log("User role type:", typeof userData?.role);
+      console.log("Is role instructor?", userData?.role === "instructor");
+      console.log(
+        "Is role instructor (case insensitive)?",
+        userData?.role?.toLowerCase() === "instructor"
+      );
+      // console.log("User data for navigation:", userData);
+      // console.log("User role (lowercase):", userData?.role?.toLowerCase());
+      // console.log(
+      //   "Is instructor check:",
+      //   userData &&
+      //     (userData.role?.toLowerCase() === "instructor" ||
+      //       userData.role?.toLowerCase() === "admin")
+      // );
+
+      // Handle navigation based on user role
+      if (
+        userData &&
+        (userData.role?.toLowerCase() === "instructor" ||
+          userData.role?.toLowerCase() === "admin")
+      ) {
+        console.log("Navigating to instructor dashboard as:", userData.role);
+        navigate("/instructor/dashboard");
+      } else {
+        console.log("Navigating to:", from);
+        navigate(from, { replace: true });
+      }
     } catch (err) {
+      console.error("Login error:", err);
       setError(
         err.response?.data?.message || "Login failed. Please try again."
       );
-      toast.error("Login failed");
+      toast.error("Login failed. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-100">
+    <div className="min-h-screen flex flex-col justify-center py-6 sm:py-12 px-4 sm:px-6 lg:px-8 bg-gray-100">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
           Welcome back to <span className="text-indigo-600">Course</span>
           <span className="text-blue-500">Eight</span>
         </h2>
@@ -54,17 +89,17 @@ const Login = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-white py-6 px-4 sm:py-8 sm:px-10 shadow sm:rounded-lg">
           {error && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
               <div className="flex items-center">
-                <FiAlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                <FiAlertCircle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0" />
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
               <label
                 htmlFor="email"

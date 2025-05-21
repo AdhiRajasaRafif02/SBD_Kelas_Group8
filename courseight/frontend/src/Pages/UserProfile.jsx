@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "./Contexts/AuthContext";
-import { courseAPI, progressAPI } from "./Services/api";
+import { courseAPI, progressAPI } from "./Services/serviceApi";
 import {
   FiEdit,
   FiSave,

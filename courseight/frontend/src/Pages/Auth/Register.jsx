@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { FiLock, FiMail, FiUser, FiAlertCircle } from "react-icons/fi";
+import { FiUser, FiMail, FiLock, FiShield } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const Register = () => {
@@ -9,7 +9,8 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+  const [role, setRole] = useState("student");
+  const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const { register } = useContext(AuthContext);
@@ -17,34 +18,28 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
-    // Validation
-    if (!username || !email || !password || !confirmPassword) {
-      setError("All fields are required");
-      return;
-    }
-
+    // Validate form data
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      return;
-    }
-
     try {
       setIsLoading(true);
-      await register(username, email, password);
+      setError(null);
+
+      // Include role in the registration data
+      await register(username, email, password, role);
+
       toast.success("Registration successful! Please log in.");
       navigate("/login");
-    } catch (err) {
+    } catch (error) {
+      console.error("Registration error:", error);
       setError(
-        err.response?.data?.message || "Registration failed. Please try again."
+        error.response?.data?.message ||
+          "Registration failed. Please try again."
       );
-      toast.error("Registration failed");
     } finally {
       setIsLoading(false);
     }
@@ -54,11 +49,12 @@ const Register = () => {
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-100">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Join <span className="text-indigo-600">Course</span>
-          <span className="text-blue-500">Eight</span> today
+          Create your account
         </h2>
-        <p className="mt-2 text-center text-gray-600 text-sm">
-          Create your account and start your learning journey
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Join <span className="font-medium text-indigo-600">Course</span>
+          <span className="font-medium text-blue-500">Eight</span> and start
+          learning today
         </p>
       </div>
 
@@ -66,14 +62,16 @@ const Register = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {error && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
-              <div className="flex items-center">
-                <FiAlertCircle className="h-5 w-5 text-red-400 mr-2" />
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="flex">
+                <div>
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
               </div>
             </div>
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Username field */}
             <div>
               <label
                 htmlFor="username"
@@ -89,7 +87,6 @@ const Register = () => {
                   id="username"
                   name="username"
                   type="text"
-                  autoComplete="username"
                   required
                   className="pl-10 block w-full focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 rounded-md"
                   placeholder="johndoe"
@@ -99,6 +96,7 @@ const Register = () => {
               </div>
             </div>
 
+            {/* Email field */}
             <div>
               <label
                 htmlFor="email"
@@ -124,6 +122,7 @@ const Register = () => {
               </div>
             </div>
 
+            {/* Password field */}
             <div>
               <label
                 htmlFor="password"
@@ -142,12 +141,14 @@ const Register = () => {
                   autoComplete="new-password"
                   required
                   className="pl-10 block w-full focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 rounded-md"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
             </div>
 
+            {/* Confirm Password field */}
             <div>
               <label
                 htmlFor="confirmPassword"
@@ -166,10 +167,39 @@ const Register = () => {
                   autoComplete="new-password"
                   required
                   className="pl-10 block w-full focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 rounded-md"
+                  placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
+            </div>
+
+            {/* Role selection dropdown */}
+            <div>
+              <label
+                htmlFor="role"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Register as
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiShield className="h-5 w-5 text-gray-400" />
+                </div>
+                <select
+                  id="role"
+                  name="role"
+                  className="pl-10 block w-full focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 rounded-md"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  <option value="student">Student</option>
+                  <option value="instructor">Instructor</option>
+                </select>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Instructors can create courses and manage students
+              </p>
             </div>
 
             <div>
@@ -200,9 +230,9 @@ const Register = () => {
             <div className="mt-6">
               <Link
                 to="/login"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Sign in to your account
+                Sign in
               </Link>
             </div>
           </div>

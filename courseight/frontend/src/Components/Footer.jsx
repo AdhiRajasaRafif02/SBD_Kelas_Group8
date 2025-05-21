@@ -4,8 +4,8 @@ import { FiGithub, FiInstagram, FiTwitter, FiLinkedin } from "react-icons/fi";
 const Footer = () => {
   return (
     <footer className="bg-gray-800 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="md:col-span-1">
             <span className="font-bold text-xl">
               Course<span className="text-blue-400">Eight</span>
@@ -30,7 +30,7 @@ const Footer = () => {
             </div>
           </div>
 
-          <div>
+          <div className="hidden md:block">
             <h3 className="text-sm font-semibold uppercase tracking-wider">
               Resources
             </h3>
@@ -67,7 +67,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div>
+          <div className="hidden md:block">
             <h3 className="text-sm font-semibold uppercase tracking-wider">
               Company
             </h3>
@@ -95,7 +95,7 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div>
+          <div className="hidden md:block">
             <h3 className="text-sm font-semibold uppercase tracking-wider">
               Legal
             </h3>
@@ -119,7 +119,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-gray-700 pt-8">
+        <div className="mt-8 border-t border-gray-700 pt-6">
           <p className="text-sm text-gray-400 text-center">
             &copy; {new Date().getFullYear()} CourseEight. All rights reserved.
           </p>

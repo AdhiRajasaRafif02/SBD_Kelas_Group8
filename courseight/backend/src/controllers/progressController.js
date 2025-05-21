@@ -4,6 +4,7 @@ const Progress = require("../models/Progress");
 exports.getUserProgress = async (req, res) => {
   try {
     const { userId, courseId } = req.params;
+    console.log(`Fetching progress for user ${userId} and course ${courseId}`);
 
     const progress = await Progress.findOne({ userId, courseId });
 
@@ -11,8 +12,10 @@ exports.getUserProgress = async (req, res) => {
       return res.status(404).json({ message: "Progress not found" });
     }
 
+    console.log(`Found progress: ${progress.progressPercentage}%`);
     res.status(200).json(progress);
   } catch (error) {
+    console.error("Progress fetch error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };

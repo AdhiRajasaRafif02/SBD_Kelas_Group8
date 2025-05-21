@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { assessmentAPI } from "../Services/api";
+import { assessmentAPI, courseAPI } from "../Services/serviceApi";
 import {
   FiClock,
   FiFileText,
@@ -9,6 +9,7 @@ import {
   FiCheck,
   FiFilter,
   FiChevronDown,
+  FiCalendar,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -18,60 +19,185 @@ const AssessmentList = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [courses, setCourses] = useState({}); // To store course info keyed by ID
 
   useEffect(() => {
-    const fetchAssessments = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await assessmentAPI.getAllAssessments();
 
-        // Map assessment statuses based on due dates
-        const mappedAssessments = data.map((assessment) => {
-          const dueDate = new Date(assessment.dueDate);
+        // Fetch courses first to get course info for assessments
+        const coursesData = await courseAPI.getAllCourses(1, 100);
+        const courseMap = {};
+        const enrolledCourseIds = new Set(); // Track enrolled course IDs
+
+        if (coursesData.courses) {
+          coursesData.courses.forEach((course) => {
+            courseMap[course._id] = course;
+
+            // Cek apakah user terdaftar di course ini
+            if (course.students && course.students.includes(user.id)) {
+              enrolledCourseIds.add(course._id);
+            }
+          });
+        }
+        setCourses(courseMap);
+
+        // Fetch assessments
+        const assessmentsData = await assessmentAPI.getAllAssessments();
+        console.log("Total assessments fetched:", assessmentsData.length);
+        console.log("Enrolled course IDs:", Array.from(enrolledCourseIds));
+
+        // Log detailed assessment data to debug
+        assessmentsData.forEach((assessment) => {
+          const courseIdInfo = assessment.courseId
+            ? typeof assessment.courseId === "object"
+              ? `Object with _id ${assessment.courseId._id}`
+              : `String: ${assessment.courseId}`
+            : "undefined";
+          console.log(
+            `Assessment "${assessment.title}" has courseId: ${courseIdInfo}`
+          );
+        });
+
+        // Improved filter function that handles more edge cases
+        const filteredAssessments = assessmentsData.filter((assessment) => {
+          // Skip assessments without courseId
+          if (!assessment.courseId) {
+            console.log(`Assessment ${assessment.title} has no courseId`);
+            return false;
+          }
+
+          // Handle various ID formats
+          let courseIdToCheck;
+          if (typeof assessment.courseId === "object") {
+            // Handle populated object
+            if (assessment.courseId._id) {
+              courseIdToCheck = assessment.courseId._id.toString();
+            } else {
+              console.log(
+                `Assessment ${assessment.title} has invalid courseId object`
+              );
+              return false;
+            }
+          } else {
+            // Handle string ID
+            courseIdToCheck = assessment.courseId.toString();
+          }
+
+          // Check if in any enrolled course (using includes for partial matching too)
+          let matched = false;
+          for (const enrolledId of enrolledCourseIds) {
+            if (
+              courseIdToCheck === enrolledId ||
+              courseIdToCheck.includes(enrolledId) ||
+              enrolledId.includes(courseIdToCheck)
+            ) {
+              matched = true;
+              break;
+            }
+          }
+
+          console.log(
+            `Assessment ${assessment.title} with courseId ${courseIdToCheck}: enrolled=${matched}`
+          );
+          return matched;
+        });
+
+        console.log(
+          "Filtered to enrolled courses:",
+          filteredAssessments.length
+        );
+
+        // Enrich assessment data with course info and status
+        const enrichedAssessments = filteredAssessments.map((assessment) => {
+          const dueDate = new Date(assessment.dueDate || Date.now() + 86400000);
           const now = new Date();
-          let status = "upcoming";
 
+          // Determine status based on dueDate
+          let status = "upcoming";
           if (dueDate < now) {
             status = "completed";
           } else if (dueDate - now < 24 * 60 * 60 * 1000) {
-            // 24 hours
             status = "inProgress";
           }
+
+          // Perbaikan ekstraksi courseId dan courseName
+          let courseName = "Unknown Course";
+          let courseIdStr = "";
+
+          // Handle kasus ketika courseId adalah objek hasil populate
+          if (assessment.courseId && typeof assessment.courseId === "object") {
+            // Jika courseId sudah di-populate, ambil title langsung
+            if (assessment.courseId.title) {
+              courseName = assessment.courseId.title;
+            }
+            // Simpan ID untuk lookup
+            courseIdStr = assessment.courseId._id?.toString();
+          } else if (assessment.courseId) {
+            // Jika courseId string biasa
+            courseIdStr = assessment.courseId.toString();
+            // Coba ambil dari courseMap
+            if (courseMap[courseIdStr]) {
+              courseName = courseMap[courseIdStr].title;
+            }
+          }
+
+          // Debug
+          console.log(
+            `Assessment ${
+              assessment.title
+            }: courseId type=${typeof assessment.courseId}, value=${JSON.stringify(
+              assessment.courseId
+            )}, resolved name=${courseName}`
+          );
 
           return {
             ...assessment,
             status,
+            courseName,
+            type: assessment.type || "Quiz",
+            questions: assessment.questions ? assessment.questions.length : 0,
+            progress: Math.floor(Math.random() * 100), // Placeholder - replace with actual progress
+            score:
+              assessment.results && assessment.results.length > 0
+                ? assessment.results[0].score
+                : null,
+            maxScore: 100, // Placeholder - replace with actual maxScore
           };
         });
 
-        // Filter assessments based on selected filter
-        let filteredAssessments = [...mappedAssessments];
+        // Apply filter
+        let filteredAssessmentsFinal = [...enrichedAssessments];
         if (filter !== "all") {
-          filteredAssessments = mappedAssessments.filter(
+          filteredAssessmentsFinal = enrichedAssessments.filter(
             (a) => a.status === filter
           );
         }
 
-        setAssessments(filteredAssessments);
+        setAssessments(filteredAssessmentsFinal);
       } catch (error) {
         console.error("Error fetching assessments:", error);
         toast.error("Failed to load assessments");
-        // Fallback to empty array
         setAssessments([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAssessments();
-  }, [filter]);
+    fetchData();
+  }, [filter, user.id]); // Tambahkan user.id ke dependency array
 
+  // Helper function to format dates
   const formatDate = (dateString) => {
+    if (!dateString) return "No date set";
     const options = { year: "numeric", month: "long", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  // Helper function to get days remaining
   const getDaysRemaining = (dateString) => {
+    if (!dateString) return 0;
     const dueDate = new Date(dateString);
     const today = new Date();
     const diffTime = dueDate - today;
@@ -79,6 +205,7 @@ const AssessmentList = () => {
     return diffDays;
   };
 
+  // Helper function to render status badge
   const getStatusBadge = (assessment) => {
     const { status } = assessment;
 
@@ -102,12 +229,13 @@ const AssessmentList = () => {
         </span>
       ) : (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <FiClock className="mr-1" /> Upcoming
+          <FiCalendar className="mr-1" /> Upcoming
         </span>
       );
     }
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -116,30 +244,7 @@ const AssessmentList = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center">
-          <FiAlertCircle className="mx-auto h-12 w-12 text-yellow-500" />
-          <h2 className="mt-2 text-lg font-medium text-gray-900">
-            Authentication Required
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            You need to be logged in to view your assessments.
-          </p>
-          <div className="mt-6">
-            <Link
-              to="/login"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Log in
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Render list
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="border-b pb-5 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -211,7 +316,7 @@ const AssessmentList = () => {
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <ul className="divide-y divide-gray-200">
             {assessments.map((assessment) => (
-              <li key={assessment._id}>
+              <li key={assessment._id || assessment.id}>
                 <div className="px-4 py-4 sm:px-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -233,7 +338,7 @@ const AssessmentList = () => {
                       </div>
                       <div className="ml-4">
                         <Link
-                          to={`/assessments/${assessment._id}`}
+                          to={`/assessments/${assessment._id || assessment.id}`}
                           className="text-lg font-medium text-indigo-600 hover:text-indigo-500"
                         >
                           {assessment.title}
@@ -248,7 +353,8 @@ const AssessmentList = () => {
 
                   <div className="mt-4">
                     <p className="text-sm text-gray-600">
-                      {assessment.description}
+                      {assessment.description ||
+                        "Complete this assessment to test your knowledge."}
                     </p>
                   </div>
 
@@ -263,7 +369,9 @@ const AssessmentList = () => {
                     </div>
                     <div>
                       <p className="text-gray-500">Time Limit</p>
-                      <p className="font-medium">{assessment.timeLimit} min</p>
+                      <p className="font-medium">
+                        {assessment.timeLimit || 30} min
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-500">Due Date</p>
@@ -279,11 +387,12 @@ const AssessmentList = () => {
                         <div className="relative w-24 h-2 bg-gray-200 rounded-full mr-2">
                           <div
                             className="absolute top-0 left-0 h-full bg-green-500 rounded-full"
-                            style={{ width: `${assessment.score}%` }}
+                            style={{ width: `${assessment.score || 0}%` }}
                           ></div>
                         </div>
                         <span className="text-sm font-medium text-gray-700">
-                          Score: {assessment.score}/{assessment.maxScore}
+                          Score: {assessment.score || 0}/
+                          {assessment.maxScore || 100}
                         </span>
                       </div>
                     ) : assessment.status === "inProgress" ? (
@@ -291,11 +400,11 @@ const AssessmentList = () => {
                         <div className="relative w-24 h-2 bg-gray-200 rounded-full mr-2">
                           <div
                             className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
-                            style={{ width: `${assessment.progress}%` }}
+                            style={{ width: `${assessment.progress || 0}%` }}
                           ></div>
                         </div>
                         <span className="text-sm font-medium text-gray-700">
-                          Progress: {assessment.progress}%
+                          Progress: {assessment.progress || 0}%
                         </span>
                       </div>
                     ) : (
@@ -309,7 +418,7 @@ const AssessmentList = () => {
                     )}
 
                     <Link
-                      to={`/assessments/${assessment._id}`}
+                      to={`/assessments/${assessment._id || assessment.id}`}
                       className={`px-4 py-2 text-sm font-medium rounded-md ${
                         assessment.status === "completed"
                           ? "bg-gray-100 text-gray-800 hover:bg-gray-200"

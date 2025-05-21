@@ -1,123 +1,138 @@
 import { createContext, useState, useEffect } from "react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { api } from "../Services/serviceApi";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Check if user is already logged in from localStorage
   useEffect(() => {
-    const checkLoggedIn = async () => {
+    // Check if user is in localStorage
+    const storedUser = localStorage.getItem("user");
+
+    if (storedUser) {
       try {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
 
-          // Optional: verify the token is still valid with the backend
+        // Optional session verification - skip if endpoint not available
+        const verifySession = async () => {
           try {
-            await axios.get(`${API_URL}/auth/verify`, {
-              headers: { Authorization: `Bearer ${parsedUser.id}` },
-            });
-            setUser(parsedUser);
-          } catch (verifyError) {
-            // If verification fails, clear stored user data
-            console.log("Session expired or invalid, please login again");
-            localStorage.removeItem("user");
-            setUser(null);
+            const response = await api.get("/auth/verify");
+            // If role differs from localStorage, update it
+            if (response.data.role !== parsedUser.role) {
+              const updatedUser = { ...parsedUser, role: response.data.role };
+              setUser(updatedUser);
+              localStorage.setItem("user", JSON.stringify(updatedUser));
+            }
+          } catch (error) {
+            // Only log out the user for auth errors (401/403), not for 404
+            if (
+              error.response &&
+              (error.response.status === 401 || error.response.status === 403)
+            ) {
+              console.error("Session expired:", error);
+              localStorage.removeItem("user");
+              setUser(null);
+            } else if (error.response && error.response.status === 404) {
+              // Just log a warning if the endpoint doesn't exist
+              console.warn("Auth verification endpoint not available");
+              // Keep the user logged in from localStorage
+            } else {
+              console.error("Error verifying session:", error);
+            }
           }
-        }
-      } catch (err) {
-        console.error("Error checking authentication:", err);
-        localStorage.removeItem("user");
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+        };
 
-    checkLoggedIn();
+        verifySession();
+      } catch (error) {
+        console.error("Error parsing user from localStorage:", error);
+        localStorage.removeItem("user");
+      }
+    }
+
+    setLoading(false);
   }, []);
 
-  // Register new user
-  const register = async (username, email, password) => {
-    try {
-      const res = await axios.post(`${API_URL}/auth/register`, {
-        username,
-        email,
-        password,
-        role: "student",
-      });
-      return res.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
-      throw err;
-    }
+  const register = async (username, email, password, role = "student") => {
+    const response = await api.post("/auth/register", {
+      username,
+      email,
+      password,
+      role,
+    });
+    return response.data;
   };
 
-  // Login user
   const login = async (email, password) => {
     try {
-      const res = await axios.post(
-        `${API_URL}/auth/login`,
-        { email, password },
-        { withCredentials: true }
-      );
+      const response = await api.post("/auth/login", {
+        email,
+        password,
+      });
 
-      // Store user in state and localStorage
-      const userData = res.data.user;
+      console.log("Raw login response:", response.data);
+
+      // Ekstraksi data pengguna dari respons backend
+      const userData = {
+        id: response.data.userId || response.data.user?.id || "",
+        username: response.data.username || response.data.user?.username || "",
+        email: response.data.email || email,
+        // Pastikan role dikonversi ke lowercase untuk konsistensi
+        role: (
+          response.data.role ||
+          response.data.user?.role ||
+          "student"
+        ).toLowerCase(),
+      };
+
+      console.log("Extracted user data:", userData);
+      console.log("Role is:", userData.role);
+
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData));
 
-      return res.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
-      throw err;
+      return {
+        user: userData,
+        token: response.data.token,
+      };
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
     }
   };
 
-  // Logout user
   const logout = async () => {
     try {
-      // Notify backend about logout
-      await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
-    } catch (err) {
-      console.error("Logout API error:", err);
-      // Continue with client-side logout even if API fails
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Error during logout:", error);
     } finally {
-      // Always clear local data
       setUser(null);
       localStorage.removeItem("user");
     }
   };
 
-  // Update user profile
   const updateProfile = async (userData) => {
-    try {
-      const authHeaders = user
-        ? { headers: { Authorization: `Bearer ${user.id}` } }
-        : {};
+    const response = await api.put("/auth/profile", userData);
 
-      const res = await axios.put(
-        `${API_URL}/auth/profile`,
-        userData,
-        authHeaders
-      );
+    const updatedUser = {
+      ...user,
+      username: userData.username,
+      email: userData.email,
+    };
 
-      // Update user in state and localStorage
-      const updatedUser = { ...user, ...res.data };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
 
-      return res.data;
-    } catch (err) {
-      setError(err.response?.data?.message || "Update failed");
-      throw err;
-    }
+    return response.data;
+  };
+
+  const isInstructor = () => {
+    if (!user) return false;
+    const role = user.role?.toLowerCase() || "";
+    return role === "instructor" || role === "admin";
   };
 
   return (
@@ -125,11 +140,11 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         loading,
-        error,
         register,
         login,
         logout,
         updateProfile,
+        isInstructor,
       }}
     >
       {children}

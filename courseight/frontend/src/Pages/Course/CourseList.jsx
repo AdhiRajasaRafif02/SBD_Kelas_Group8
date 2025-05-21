@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { courseAPI } from "../Services/api";
-import { FiBook, FiUser, FiCalendar, FiSearch } from "react-icons/fi";
+import { courseAPI } from "../Services/serviceApi";
+import {
+  FiBook,
+  FiUser,
+  FiCalendar,
+  FiSearch,
+  FiArrowRight,
+} from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const CourseList = () => {
@@ -111,63 +117,75 @@ const CourseList = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Course Grid with responsive cols */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {courses.length > 0 ? (
               courses.map((course) => (
                 <div
                   key={course._id}
                   className="bg-white overflow-hidden shadow rounded-lg transition transform hover:scale-105 hover:shadow-lg"
                 >
-                  <div className="p-6">
+                  <div className="p-4 sm:p-6">
                     <div className="flex justify-between items-start">
-                      <div className="bg-indigo-100 p-2 rounded-md">
-                        <FiBook className="h-6 w-6 text-indigo-600" />
+                      <div className="bg-indigo-100 p-2 rounded-md flex-shrink-0">
+                        <FiBook className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
                       </div>
-                      <div className="bg-gray-100 px-2.5 py-0.5 rounded-full text-sm font-medium text-gray-800">
-                        {course.students?.length || 0} students
-                      </div>
-                    </div>
-                    <h3 className="mt-4 text-lg font-medium text-gray-900 truncate">
-                      {course.title}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500 line-clamp-2">
-                      {course.description}
-                    </p>
-                    <div className="mt-4 flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
-                          {course.instructor?.username?.charAt(0) || "I"}
-                        </div>
-                      </div>
-                      <div className="ml-2">
-                        <p className="text-sm font-medium text-gray-900">
-                          {course.instructor?.username || "Instructor"}
+                      <div className="flex-1 ml-3">
+                        <Link
+                          to={`/courses/${course._id}`}
+                          className="text-base sm:text-lg font-medium text-gray-900 hover:text-indigo-600 line-clamp-2"
+                        >
+                          {course.title}
+                        </Link>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500 line-clamp-1">
+                          By{" "}
+                          {course.instructor?.username || "Unknown Instructor"}
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center text-sm text-gray-500">
-                      <FiCalendar className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                      <span>Created {formatDate(course.createdAt)}</span>
+
+                    <p className="mt-3 text-sm text-gray-600 line-clamp-3">
+                      {course.description}
+                    </p>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:text-sm">
+                      <div className="flex items-center">
+                        <FiCalendar className="mr-1 h-4 w-4 text-gray-500" />
+                        <span className="text-gray-500">
+                          {formatDate(course.updatedAt)}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <FiUser className="mr-1 h-4 w-4 text-gray-500" />
+                        <span className="text-gray-500">
+                          {course.students?.length || 0} enrolled
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-4">
+
+                    <div className="mt-4 flex justify-between items-center">
+                      <span className="text-sm font-medium text-indigo-600">
+                        {course.level}
+                      </span>
                       <Link
                         to={`/courses/${course._id}`}
-                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500"
                       >
-                        View Course
+                        View Details
+                        <FiArrowRight className="ml-1 h-4 w-4" />
                       </Link>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="col-span-3 text-center py-12">
-                <FiBook className="mx-auto h-12 w-12 text-gray-400" />
+              <div className="col-span-full text-center py-10 bg-white rounded-lg shadow">
+                <FiInfo className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">
                   No courses found
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Try adjusting your search parameters.
+                  Try adjusting your search or filters.
                 </p>
               </div>
             )}

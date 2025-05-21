@@ -1,12 +1,13 @@
 import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { discussionAPI, courseAPI } from "../Services/api";
+import { discussionAPI, courseAPI } from "../Services/serviceApi";
 import {
   FiMessageSquare,
   FiSearch,
   FiFilter,
   FiChevronDown,
+  FiChevronUp,
   FiPlus,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
