@@ -9,6 +9,9 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiPlus,
+  FiThumbsUp,
+  FiClock,
+  FiTag,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -26,6 +29,8 @@ const DiscussionList = () => {
     content: "",
     courseId: "",
   });
+  const [sortOrder, setSortOrder] = useState("latest");
+  const [expandedDiscussion, setExpandedDiscussion] = useState(null);
 
   // Fetch courses for dropdown
   useEffect(() => {
@@ -43,38 +48,60 @@ const DiscussionList = () => {
     fetchCourses();
   }, []);
 
-  // Fetch discussions based on filters
+  // Format date
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+  // Fetch discussions based on selected course
   useEffect(() => {
     const fetchDiscussions = async () => {
       try {
         setLoading(true);
-        let discussionsData = [];
-
-        if (filter === "course" && selectedCourseId) {
-          // Fetch discussions for a specific course
-          discussionsData = await discussionAPI.getDiscussionsByCourse(
-            selectedCourseId
-          );
+        let response;
+        
+        if (selectedCourseId) {
+          response = await discussionAPI.getDiscussionsByCourse(selectedCourseId);
         } else {
-          // Fetch all discussions
-          discussionsData = await discussionAPI.getAllDiscussions();
-
-          // Filter by user if needed
-          if (filter === "my" && user) {
-            discussionsData = discussionsData.filter(
-              (d) => d.userId === user.id
+          response = await discussionAPI.getDiscussions();
+        }
+        
+        if (response && response.discussions) {
+          let filteredDiscussions = response.discussions;
+          
+          // Apply search filter if search term exists
+          if (searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            filteredDiscussions = filteredDiscussions.filter(discussion =>
+              discussion.title?.toLowerCase().includes(searchLower) ||
+              discussion.content?.toLowerCase().includes(searchLower) ||
+              discussion.tags?.some(tag => tag.toLowerCase().includes(searchLower))
             );
           }
+          
+          // Apply sorting
+          filteredDiscussions.sort((a, b) => {
+            switch (sortOrder) {
+              case 'oldest':
+                return new Date(a.createdAt) - new Date(b.createdAt);
+              case 'mostReplies':
+                return (b.replies?.length || 0) - (a.replies?.length || 0);
+              case 'mostLikes':
+                return (b.likes?.length || 0) - (a.likes?.length || 0);
+              default: // 'latest'
+                return new Date(b.createdAt) - new Date(a.createdAt);
+            }
+          });
+          
+          setDiscussions(filteredDiscussions);
+        } else {
+          setDiscussions([]);
         }
-
-        // Apply search filter if provided
-        if (searchTerm) {
-          discussionsData = discussionsData.filter((d) =>
-            d.content.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-
-        setDiscussions(discussionsData);
       } catch (error) {
         console.error("Error fetching discussions:", error);
         toast.error("Failed to fetch discussions");
@@ -85,23 +112,35 @@ const DiscussionList = () => {
     };
 
     fetchDiscussions();
-  }, [searchTerm, filter, selectedCourseId, user?.id]);
-
+  }, [selectedCourseId, searchTerm, sortOrder]);
   // Handle creating a new discussion
   const handleNewDiscussionSubmit = async (e) => {
     e.preventDefault();
 
-    if (!newDiscussionData.content || !newDiscussionData.courseId) {
+    if (!newDiscussionData.title || !newDiscussionData.content || !newDiscussionData.courseId) {
       toast.error("Please fill all required fields");
       return;
     }
 
     try {
       setLoading(true);
-      await discussionAPI.createDiscussion(newDiscussionData);
+      const response = await discussionAPI.createDiscussion({
+        ...newDiscussionData,
+        tags: newDiscussionData.tags || []
+      });
 
-      // Reset form and refresh discussions
-      setNewDiscussionData({ content: "", courseId: "" });
+      // Add the new discussion to the list
+      if (response.discussion) {
+        setDiscussions(prev => [response.discussion, ...prev]);
+      }
+
+      // Reset form and close modal
+      setNewDiscussionData({
+        title: "",
+        content: "",
+        courseId: "",
+        tags: []
+      });
       setShowNewDiscussion(false);
 
       // Refresh discussions list
@@ -125,184 +164,204 @@ const DiscussionList = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-5xl">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">
-        <FiMessageSquare className="inline-block mr-2 text-indigo-600" />
-        Course Discussions
-      </h1>
+    <div className="container mx-auto px-4 py-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4 md:mb-0">
+          Course Discussions
+        </h1>
+        <button
+          onClick={() => setShowNewDiscussion(true)}
+          className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+        >
+          <FiPlus className="mr-2" />
+          New Discussion
+        </button>
+      </div>
 
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div className="relative w-full md:w-1/2">
-            <input
-              type="text"
-              placeholder="Search discussions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <FiSearch className="absolute top-3 left-3 text-gray-500" />
-          </div>
-
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition"
-          >
-            <FiFilter className="mr-2" />
-            {showFilters ? "Hide Filters" : "Show Filters"}
-            {showFilters ? (
-              <FiChevronDown className="ml-2" />
-            ) : (
-              <FiChevronUp className="ml-2" />
-            )}
-          </button>
-        </div>
-
-        {showFilters && (
-          <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
-            <h2 className="font-medium text-gray-700 mb-3">Filter Options</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter By
-                </label>
-                <select
-                  value={filter}
-                  onChange={(e) => {
-                    setFilter(e.target.value);
-                    if (e.target.value !== "course") {
-                      setSelectedCourseId("");
-                    }
-                  }}
-                  className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="all">All Discussions</option>
-                  {user && <option value="my">My Discussions</option>}
-                  <option value="course">By Course</option>
-                </select>
-              </div>
-
-              {filter === "course" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Course
-                  </label>
-                  <select
-                    value={selectedCourseId}
-                    onChange={(e) => setSelectedCourseId(e.target.value)}
-                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Select a course...</option>
-                    {courses.map((course) => (
-                      <option key={course._id} value={course._id}>
-                        {course.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      {/* Filters and Search Section */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search discussions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
             </div>
           </div>
-        )}
+          <select
+            value={selectedCourseId}
+            onChange={(e) => setSelectedCourseId(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          >
+            <option value="">All Courses</option>
+            {courses.map((course) => (
+              <option key={course._id} value={course._id}>
+                {course.title}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          >
+            <option value="latest">Latest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="mostReplies">Most Replies</option>
+            <option value="mostLikes">Most Likes</option>
+          </select>
+        </div>
+      </div>
 
+      {/* Discussions List */}
+      <div className="space-y-4">
         {loading ? (
-          <div className="flex justify-center items-center py-10">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
         ) : discussions.length === 0 ? (
-          <div className="text-center py-10">
+          <div className="text-center py-8">
             <FiMessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No discussions found
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {filter === "my"
-                ? "You haven't created any discussions yet."
-                : filter === "course" && selectedCourseId
-                ? `No discussions for ${getCourseTitle(selectedCourseId)}.`
-                : "No discussions match your search criteria."}
-            </p>
+            <p className="mt-2 text-gray-500">No discussions found</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {discussions.map((discussion) => (
-              <div
-                key={discussion._id}
-                className="border rounded-lg p-4 hover:shadow-md transition"
-              >
-                <div className="mb-2">
-                  <Link
-                    to={`/discussions/${discussion._id}`}
-                    className="text-lg font-medium text-indigo-600 hover:text-indigo-800 line-clamp-1 mb-2"
-                  >
-                    {discussion.content.substring(0, 60)}...
-                  </Link>
+          discussions.map((discussion) => (
+            <div
+              key={discussion._id}
+              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4">
+                    <img
+                      src={
+                        discussion.userId.avatar ||
+                        `https://ui-avatars.com/api/?name=${discussion.userId.name}`
+                      }
+                      alt={discussion.userId.name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {discussion.title}
+                      </h3>
+                      <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <span>{discussion.userId.name}</span>
+                        <span>•</span>
+                        <span>{formatDate(discussion.createdAt)}</span>
+                        {discussion.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-1 bg-gray-100 rounded-full text-xs"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4 text-gray-500">
+                    <span className="flex items-center">
+                      <FiMessageSquare className="mr-1" />
+                      {discussion.replies.length}
+                    </span>
+                    <span className="flex items-center">
+                      <FiThumbsUp className="mr-1" />
+                      {discussion.likes.length}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4">
                   <p className="text-gray-600 line-clamp-2">
                     {discussion.content}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center text-gray-500 text-sm mt-3">
-                  <div className="flex items-center mr-4">
-                    <FiUser className="mr-1" />
-                    <span>{discussion.user?.username || "Unknown User"}</span>
-                  </div>
+                {/* Replies Preview */}
+                {discussion.replies.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+                      <span>Latest replies</span>
+                      <button
+                        onClick={() =>
+                          setExpandedDiscussion(
+                            expandedDiscussion === discussion._id
+                              ? null
+                              : discussion._id
+                          )
+                        }
+                        className="flex items-center text-indigo-600 hover:text-indigo-700"
+                      >
+                        {expandedDiscussion === discussion._id
+                          ? "Show less"
+                          : "Show more"}
+                        {expandedDiscussion === discussion._id ? (
+                          <FiChevronUp className="ml-1" />
+                        ) : (
+                          <FiChevronDown className="ml-1" />
+                        )}
+                      </button>
+                    </div>
 
-                  <div className="flex items-center mr-4">
-                    <FiCalendar className="mr-1" />
-                    <span>
-                      {new Date(discussion.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  <div className="mr-4 px-2 py-1 bg-gray-100 rounded-full text-xs">
-                    {getCourseTitle(discussion.courseId)}
-                  </div>
-
-                  <div className="ml-auto flex space-x-2">
-                    {user &&
-                      (discussion.userId === user._id ||
-                        user.role === "admin" ||
-                        user.role === "instructor") && (
-                        <>
-                          <Link to={`/discussions/edit/${discussion._id}`}>
-                            <button className="text-blue-500 hover:text-blue-700">
-                              <FiEdit size={16} />
-                            </button>
-                          </Link>
-                          <button
-                            onClick={() =>
-                              handleDeleteDiscussion(discussion._id)
-                            }
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <FiTrash size={16} />
-                          </button>
-                        </>
-                      )}
-                    <Link
-                      to={`/discussions/${discussion._id}`}
-                      className="text-indigo-600 hover:text-indigo-800 font-medium"
+                    <div
+                      className={`space-y-3 ${
+                        expandedDiscussion === discussion._id
+                          ? ""
+                          : "max-h-20 overflow-hidden"
+                      }`}
                     >
-                      View
-                    </Link>
+                      {discussion.replies.map((reply) => (
+                        <div key={reply._id} className="flex items-start space-x-3">
+                          <img
+                            src={
+                              reply.userId.avatar ||
+                              `https://ui-avatars.com/api/?name=${reply.userId.name}`
+                            }
+                            alt={reply.userId.name}
+                            className="w-6 h-6 rounded-full"
+                          />
+                          <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm">
+                                {reply.userId.name}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatDate(reply.createdAt)}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {reply.content}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    to={`/discussions/${discussion._id}`}
+                    className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                  >
+                    View full discussion
+                  </Link>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))
         )}
       </div>
 
       {user && (
         <>
-          <button
-            onClick={() => setShowNewDiscussion(true)}
-            className="fixed bottom-8 right-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg transition"
-          >
-            <FiPlus className="text-xl" />
-          </button>
-
           {showNewDiscussion && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">

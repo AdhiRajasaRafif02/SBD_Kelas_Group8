@@ -11,9 +11,37 @@ const discussionSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    title: {
+        type: String,
+        required: true
+    },
     content: {
         type: String,
         required: true
+    },
+    replies: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        content: {
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    likes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    tags: [String],
+    isAnnouncement: {
+        type: Boolean,
+        default: false
     },
     createdAt: {
         type: Date,

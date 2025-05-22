@@ -7,6 +7,9 @@ const roleAuth = require("../middleware/roleAuth");
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 
+// Route to get all discussions (with filters)
+router.get("/", discussionController.getDiscussions);
+
 // Route to create a new discussion
 router.post("/", discussionController.createDiscussion);
 
@@ -21,5 +24,14 @@ router.put("/:discussionId", discussionController.updateDiscussion);
 
 // Route to delete a discussion by ID - only allow authors and admins
 router.delete("/:discussionId", discussionController.deleteDiscussion);
+
+// Route to add a reply to a discussion
+router.post("/:discussionId/replies", discussionController.addReply);
+
+// Route to like/unlike a discussion
+router.post("/:discussionId/like", discussionController.toggleLike);
+
+// Route to delete a reply
+router.delete("/:discussionId/replies/:replyId", discussionController.deleteReply);
 
 module.exports = router;

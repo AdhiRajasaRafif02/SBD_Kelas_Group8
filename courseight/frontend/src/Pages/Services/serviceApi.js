@@ -3,6 +3,21 @@ import toast from "react-hot-toast";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+// Error handler utility
+const handleError = (error) => {
+  if (error.response) {
+    // The request was made and the server responded with a status code
+    // that falls out of the range of 2xx
+    throw new Error(error.response.data.message || "Server error occurred");
+  } else if (error.request) {
+    // The request was made but no response was received
+    throw new Error("No response from server");
+  } else {
+    // Something happened in setting up the request that triggered an Error
+    throw new Error(error.message || "Request failed");
+  }
+};
+
 // Create axios instance with withCredentials: true to send cookies
 export const api = axios.create({
   baseURL: API_URL,
@@ -364,60 +379,81 @@ export const assessmentAPI = {
 
 // Discussion API
 export const discussionAPI = {
-  getAllDiscussions: async () => {
+  getDiscussions: async () => {
     try {
-      const res = await api.get("/discussions");
-      return res.data;
+      const response = await api.get('/discussions');
+      return response.data;
     } catch (error) {
-      console.error("Error fetching discussions:", error);
+      console.error('Error fetching discussions:', error);
+      throw error;
+    }
+  },
+  getDiscussionsByCourse: async (courseId) => {
+    try {
+      const response = await api.get(`/discussions/course/${courseId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching course discussions:', error);
       throw error;
     }
   },
 
-  getDiscussionById: async (id) => {
+  getDiscussion: async (id) => {
     try {
-      const res = await api.get(`/discussions/${id}`);
-      return res.data;
+      const response = await api.get(`/discussions/${id}`);
+      return response.data;
     } catch (error) {
-      console.error(`Error fetching discussion ${id}:`, error);
+      console.error('Error fetching discussion:', error);
       throw error;
     }
   },
 
   createDiscussion: async (data) => {
     try {
-      const res = await api.post("/discussions", data);
-      return res.data;
+      const response = await api.post('/discussions', data);
+      return response.data;
     } catch (error) {
-      console.error("Error creating discussion:", error);
+      console.error('Error creating discussion:', error);
       throw error;
     }
   },
 
-  getDiscussionsByCourse: async (courseId) => {
+  addReply: async (discussionId, data) => {
     try {
-      const res = await api.get(`/discussions/course/${courseId}`);
-      return res.data;
+      const response = await api.post(`/discussions/${discussionId}/replies`, data);
+      return response.data;
     } catch (error) {
-      console.error(
-        `Error fetching discussions for course ${courseId}:`,
-        error
-      );
+      console.error('Error adding reply:', error);
       throw error;
     }
   },
 
-  addResponse: async (discussionId, content) => {
+  likeDiscussion: async (discussionId) => {
     try {
-      const res = await api.post(`/discussions/${discussionId}/responses`, {
-        content,
-      });
-      return res.data;
+      const response = await api.post(`/discussions/${discussionId}/like`);
+      return response.data;
     } catch (error) {
-      console.error(
-        `Error adding response to discussion ${discussionId}:`,
-        error
-      );
+      console.error('Error liking discussion:', error);
+      throw error;
+    }
+  },
+
+  deleteDiscussion: async (discussionId) => {
+    try {
+      const response = await api.delete(`/discussions/${discussionId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting discussion:', error);
+      throw error;
+    }
+  },
+
+  updateDiscussion: async (discussionId, data) => {
+    try {
+      const response = await api.put(`/discussions/${discussionId}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating discussion:', error);
       throw error;
     }
   },

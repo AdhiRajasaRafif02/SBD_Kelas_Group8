@@ -75,13 +75,17 @@ const Navbar = ({ toggleSidebar, sidebarOpen }) => {
               <div className="hidden lg:ml-6 lg:flex lg:space-x-6">
                 <Link
                   to="/dashboard"
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  className={`group inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-all duration-200 ease-in-out ${
                     isActive("/dashboard")
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      ? "border-indigo-500 text-indigo-600 transform scale-105"
+                      : "border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
                   }`}
                 >
-                  <FiHome className="mr-1" /> Dashboard
+                  <FiHome className="mr-1 transform group-hover:rotate-12 transition-transform duration-200" />{" "}
+                  Dashboard
+                  {isActive("/dashboard") && (
+                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 transform scale-x-100 transition-transform duration-200"/>
+                  )}
                 </Link>
                 <Link
                   to="/courses"
@@ -133,7 +137,7 @@ const Navbar = ({ toggleSidebar, sidebarOpen }) => {
                 </div>
 
                 {dropdownOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-50">
+                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 animate-dropdown">
                     <div className="px-4 py-2 text-xs text-gray-500">
                       Signed in as{" "}
                       <span className="font-bold truncate block">
@@ -145,17 +149,18 @@ const Navbar = ({ toggleSidebar, sidebarOpen }) => {
 
                     <Link
                       to="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      className="group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all duration-150"
                       onClick={() => setDropdownOpen(false)}
                     >
-                      <FiUser className="mr-2" /> Profile
+                      <FiUser className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform duration-200" />
+                      Profile
                     </Link>
-
                     <button
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      className="w-full group flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
                       onClick={handleLogout}
                     >
-                      <FiLogOut className="mr-2" /> Sign out
+                      <FiLogOut className="mr-3 h-5 w-5 group-hover:rotate-12 transition-transform duration-200" />
+                      Logout
                     </button>
                   </div>
                 )}

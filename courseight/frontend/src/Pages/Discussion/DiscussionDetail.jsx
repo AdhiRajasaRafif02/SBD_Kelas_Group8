@@ -1,351 +1,250 @@
 import { useState, useEffect, useContext } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { discussionAPI, courseAPI } from "../Services/serviceApi";
+import { discussionAPI } from "../Services/serviceApi";
 import {
   FiMessageSquare,
-  FiEdit2,
-  FiTrash2,
-  FiSave,
-  FiX,
+  FiThumbsUp,
+  FiShare2,
+  FiFlag,
+  FiClock,
+  FiUser,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 const DiscussionDetail = () => {
-  const { id: discussionId } = useParams();
-  const navigate = useNavigate();
+  const { id } = useParams();
   const { user } = useContext(AuthContext);
   const [discussion, setDiscussion] = useState(null);
-  const [course, setCourse] = useState(null);
-  const [responses, setResponses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState("");
-  const [newResponse, setNewResponse] = useState("");
+  const [replyContent, setReplyContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch discussion and related data
   useEffect(() => {
-    const fetchDiscussionDetails = async () => {
+    const fetchDiscussion = async () => {
       try {
         setLoading(true);
-
-        // Fetch discussion details
-        const discussionData = await discussionAPI.getDiscussionById(
-          discussionId
-        );
-        setDiscussion(discussionData);
-        setEditContent(discussionData.content);
-
-        // Fetch course details if courseId exists
-        if (discussionData.courseId) {
-          try {
-            const courseData = await courseAPI.getCourseById(
-              discussionData.courseId
-            );
-            setCourse(courseData);
-          } catch (error) {
-            console.error("Error fetching course details:", error);
-          }
-        }
-
-        // Fetch responses
-        if (discussionData.responses) {
-          setResponses(discussionData.responses);
-        }
+        const response = await discussionAPI.getDiscussion(id);
+        setDiscussion(response.discussion);
       } catch (error) {
-        console.error("Error fetching discussion details:", error);
+        console.error("Error fetching discussion:", error);
         toast.error("Failed to load discussion");
-        navigate("/discussions");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDiscussionDetails();
-  }, [discussionId, navigate]);
+    fetchDiscussion();
+  }, [id]);
 
-  // Handle discussion edit
-  const handleSaveEdit = async () => {
-    if (!editContent.trim()) {
-      toast.error("Discussion content cannot be empty");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      // Update the discussion via API
-      const updatedDiscussion = await discussionAPI.updateDiscussion(
-        discussionId,
-        { content: editContent }
-      );
-
-      setDiscussion(updatedDiscussion);
-      setIsEditing(false);
-      toast.success("Discussion updated successfully");
-    } catch (error) {
-      console.error("Error updating discussion:", error);
-      toast.error("Failed to update discussion");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Handle discussion deletion
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this discussion?")) {
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      await discussionAPI.deleteDiscussion(discussionId);
-      toast.success("Discussion deleted successfully");
-      navigate("/discussions");
-    } catch (error) {
-      console.error("Error deleting discussion:", error);
-      toast.error("Failed to delete discussion");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Handle new response submission
-  const handleSubmitResponse = async (e) => {
+  const handleReply = async (e) => {
     e.preventDefault();
-    if (!newResponse.trim()) {
-      toast.error("Response cannot be empty");
-      return;
-    }
+    if (!replyContent.trim()) return;
 
     try {
       setSubmitting(true);
-      const response = await discussionAPI.addResponse(
-        discussionId,
-        newResponse
-      );
-
-      // Add the response to the list
-      setResponses((prev) => [...prev, response]);
-      setNewResponse("");
-      toast.success("Response added successfully");
+      const response = await discussionAPI.addReply(id, {
+        content: replyContent,
+      });
+      setDiscussion({
+        ...discussion,
+        replies: [...discussion.replies, response.reply],
+      });
+      setReplyContent("");
+      toast.success("Reply added successfully");
     } catch (error) {
-      console.error("Error adding response:", error);
-      toast.error("Failed to add response");
+      console.error("Error adding reply:", error);
+      toast.error("Failed to add reply");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Format date function
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
+  const handleLike = async () => {
+    try {
+      const response = await discussionAPI.likeDiscussion(id);
+      setDiscussion({
+        ...discussion,
+        likes: response.likes,
+      });
+    } catch (error) {
+      console.error("Error liking discussion:", error);
+      toast.error("Failed to like discussion");
+    }
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString("en-US", {
       day: "numeric",
+      month: "short",
+      year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
   };
 
-  // Check if user can edit or delete
-  const canEditOrDelete = () => {
-    if (!user || !discussion) return false;
-    return user.id === discussion.userId || user.role === "admin";
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   if (!discussion) {
     return (
-      <div className="container mx-auto p-4 text-center">
-        <h2 className="text-2xl font-bold mb-4">Discussion not found</h2>
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-semibold text-gray-700">
+          Discussion not found
+        </h2>
         <Link
           to="/discussions"
-          className="text-indigo-600 hover:text-indigo-800"
+          className="mt-4 text-indigo-600 hover:text-indigo-700"
         >
-          &larr; Back to discussions
+          Back to discussions
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Link
-        to="/discussions"
-        className="inline-flex items-center text-indigo-600 hover:text-indigo-800 mb-6"
-      >
-        <FiArrowLeft className="mr-2" /> Back to discussions
-      </Link>
-
-      <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
-        {/* Discussion header */}
-        <div className="bg-indigo-50 p-4 border-b border-indigo-100">
-          <div className="flex justify-between items-start">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-700 font-semibold">
-                {discussion.user?.username?.charAt(0) || "U"}
-              </div>
-              <div className="ml-3">
-                <p className="font-medium text-gray-900">
-                  {discussion.user?.username || "Unknown User"}
-                </p>
-                <div className="flex items-center text-sm text-gray-500">
-                  <FiCalendar className="mr-1" size={14} />
-                  <span>{formatDate(discussion.createdAt)}</span>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Discussion Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-start space-x-4">
+            <img
+              src={
+                discussion.userId.avatar ||
+                `https://ui-avatars.com/api/?name=${discussion.userId.name}`
+              }
+              alt={discussion.userId.name}
+              className="w-12 h-12 rounded-full"
+            />
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                {discussion.title}
+              </h1>
+              <div className="flex items-center space-x-4 text-sm text-gray-500 mb-4">
+                <span className="flex items-center">
+                  <FiUser className="mr-1" />
+                  {discussion.userId.name}
+                </span>
+                <span className="flex items-center">
+                  <FiClock className="mr-1" />
+                  {formatDate(discussion.createdAt)}
+                </span>
+                <div className="flex items-center space-x-2">
+                  {discussion.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium"
+                    >
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
-
-            {course && (
-              <Link
-                to={`/courses/${course._id}`}
-                className="bg-indigo-100 text-indigo-800 text-xs px-3 py-1 rounded-full hover:bg-indigo-200"
-              >
-                {course.title}
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {/* Discussion content */}
-        <div className="p-6">
-          {isEditing ? (
-            <div>
-              <textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="w-full border border-gray-300 rounded-md p-3 focus:ring-indigo-500 focus:border-indigo-500 min-h-[150px]"
-                placeholder="Discussion content"
-              />
-
-              <div className="flex justify-end space-x-3 mt-4">
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  disabled={submitting}
-                >
-                  <FiX className="inline mr-1" /> Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  disabled={submitting}
-                >
-                  <FiSave className="inline mr-1" /> Save Changes
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p className="text-gray-800 whitespace-pre-line text-lg">
+              <p className="text-gray-700 whitespace-pre-wrap">
                 {discussion.content}
               </p>
 
-              {discussion.updatedAt > discussion.createdAt && (
-                <p className="text-xs text-gray-500 mt-4 italic">
-                  Last updated: {formatDate(discussion.updatedAt)}
-                </p>
-              )}
-
-              {canEditOrDelete() && (
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                    disabled={submitting}
-                  >
-                    <FiEdit2 className="mr-1" /> Edit
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="inline-flex items-center text-sm text-red-600 hover:text-red-800"
-                    disabled={submitting}
-                  >
-                    <FiTrash2 className="mr-1" /> Delete
-                  </button>
-                </div>
-              )}
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-6 mt-6 pt-4 border-t">
+                <button
+                  onClick={handleLike}
+                  className={`flex items-center space-x-2 text-sm ${
+                    discussion.likes.includes(user._id)
+                      ? "text-indigo-600"
+                      : "text-gray-500 hover:text-indigo-600"
+                  }`}
+                >
+                  <FiThumbsUp />
+                  <span>{discussion.likes.length} Likes</span>
+                </button>
+                <button className="flex items-center space-x-2 text-sm text-gray-500 hover:text-indigo-600">
+                  <FiShare2 />
+                  <span>Share</span>
+                </button>
+                <button className="flex items-center space-x-2 text-sm text-gray-500 hover:text-red-600">
+                  <FiFlag />
+                  <span>Report</span>
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Responses/Comments section */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2 flex items-center">
-          <FiMessageCircle className="mr-2" /> Responses ({responses.length})
-        </h2>
+        {/* Replies Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">
+            Replies ({discussion.replies.length})
+          </h2>
 
-        {responses.length > 0 ? (
-          <div className="space-y-6">
-            {responses.map((response) => (
-              <div
-                key={response._id}
-                className="bg-white p-4 rounded-lg shadow-sm border border-gray-100"
+          {/* Reply Form */}
+          <form onSubmit={handleReply} className="mb-8">
+            <textarea
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder="Add your reply..."
+              className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              rows="4"
+            />
+            <div className="mt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={submitting || !replyContent.trim()}
+                className={`px-6 py-2 rounded-lg text-white ${
+                  submitting || !replyContent.trim()
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                } transition-colors duration-200`}
               >
-                <div className="flex items-start space-x-3">
-                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-semibold">
-                    {response.user?.username?.charAt(0) || "U"}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-medium text-gray-900">
-                        {response.user?.username || "Unknown User"}
-                      </p>
-                      <span className="text-xs text-gray-500">
-                        {formatDate(response.createdAt)}
+                {submitting ? "Posting..." : "Post Reply"}
+              </button>
+            </div>
+          </form>
+
+          {/* Replies List */}
+          <div className="space-y-6">
+            {discussion.replies.map((reply) => (
+              <div key={reply._id} className="flex space-x-4 animate-fadeIn">
+                <img
+                  src={
+                    reply.userId.avatar ||
+                    `https://ui-avatars.com/api/?name=${reply.userId.name}`
+                  }
+                  alt={reply.userId.name}
+                  className="w-10 h-10 rounded-full"
+                />
+                <div className="flex-1">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">
+                        {reply.userId.name}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {formatDate(reply.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-2 text-gray-800">{response.content}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {reply.content}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-6 mt-2 ml-4">
+                    <button className="text-sm text-gray-500 hover:text-indigo-600">
+                      Like
+                    </button>
+                    <button className="text-sm text-gray-500 hover:text-indigo-600">
+                      Reply
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-600">
-              No responses yet. Be the first to respond!
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Add response form */}
-      {user && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-medium mb-4 text-gray-800">
-            Add Your Response
-          </h3>
-          <form onSubmit={handleSubmitResponse}>
-            <textarea
-              value={newResponse}
-              onChange={(e) => setNewResponse(e.target.value)}
-              placeholder="Share your thoughts or answer the question..."
-              className="w-full border border-gray-300 rounded-md p-3 focus:ring-indigo-500 focus:border-indigo-500 min-h-[100px]"
-              required
-            />
-            <div className="flex justify-end mt-4">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <FiSend className="mr-2" />
-                {submitting ? "Posting..." : "Post Response"}
-              </button>
-            </div>
-          </form>
         </div>
-      )}
+      </div>
     </div>
   );
 };

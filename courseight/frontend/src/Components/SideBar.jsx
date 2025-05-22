@@ -70,6 +70,29 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
     logout();
   };
 
+  const NavItem = ({ icon, text, path, isActive }) => (
+    <Link
+      to={path}
+      className={`flex items-center px-4 py-3 text-sm transition-all duration-200 ease-in-out transform hover:scale-102 hover:bg-indigo-50 rounded-lg mx-2 ${
+        isActive
+          ? "text-indigo-600 bg-indigo-50 font-medium shadow-sm"
+          : "text-gray-600 hover:text-indigo-600"
+      }`}
+    >
+      <span
+        className={`inline-block transform transition-transform duration-200 ${
+          isActive ? "scale-110" : "group-hover:scale-110"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="ml-3">{text}</span>
+      {isActive && (
+        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+      )}
+    </Link>
+  );
+
   return (
     <>
       {/* Mobile Sidebar Backdrop */}
@@ -81,7 +104,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         ></div>
       )}
 
-      {/* Sidebar */}      <aside
+      {/* Sidebar */}
+      <aside
         id="sidebar"
         className={`fixed top-16 left-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:shadow-none lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -89,7 +113,8 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
       >
         <div className="flex items-center justify-between p-4 border-b">
           <span className="font-bold text-lg text-indigo-600">
-            Course<span className="text-blue-500">Eight</span>
+            Course
+            <span className="text-blue-500">Eight</span>
           </span>
           <button
             type="button"
@@ -136,32 +161,15 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         <nav className="p-4 space-y-1 flex-grow overflow-y-auto">
           {navItems.map((item, index) =>
             item.divider ? (
-              <div
-                key={`divider-${index}`}
-                className="my-4 border-t border-gray-200"
-              ></div>
+              <div key={index} className="my-2 border-t border-gray-200" />
             ) : (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => window.innerWidth < 1024 && closeSidebar()}
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  isActive(item.path)
-                    ? "bg-indigo-50 text-indigo-700"
-                    : item.accent
-                    ? "text-green-700 bg-green-50 hover:bg-green-100"
-                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <span
-                  className={`mr-3 h-5 w-5 transition-colors ${
-                    item.accent ? "text-green-600" : ""
-                  }`}
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">{item.text}</span>
-              </Link>
+              <NavItem
+                key={index}
+                icon={item.icon}
+                text={item.text}
+                path={item.path}
+                isActive={location.pathname === item.path}
+              />
             )
           )}
         </nav>

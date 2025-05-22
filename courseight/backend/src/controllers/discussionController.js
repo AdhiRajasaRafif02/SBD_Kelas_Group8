@@ -1,110 +1,298 @@
 const Discussion = require('../models/Discussion');
+const Course = require('../models/Course');
+const User = require('../models/User');
+const { errorHandler } = require('../middleware/error');
 
-exports.createDiscussion = async (req, res) => {
+// Custom error classes
+class DiscussionError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = 'DiscussionError';
+    this.statusCode = statusCode;
+  }
+}
+
+// Get all discussions with filters
+exports.getDiscussions = async (req, res) => {
   try {
-    const { courseId, content } = req.body;
-    const userId = req.user._id; // Get user ID from authenticated user
+    const { courseId, search, filter, sort = 'latest' } = req.query;
+    let query = {};
 
-    const newDiscussion = new Discussion({
-      courseId,
-      userId,
-      content,
-      createdAt: new Date(),
-    });
+    // Apply filters
+    if (courseId) {
+      const course = await Course.findById(courseId);
+      if (!course) {
+        throw new DiscussionError('Course not found', 404);
+      }
+      query.courseId = courseId;
+    }
+    
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { content: { $regex: search, $options: 'i' } },
+        { tags: { $in: [new RegExp(search, 'i')] } }
+      ];
+    }
 
-    await newDiscussion.save();
-    res.status(201).json({
-      message: "Discussion created successfully",
-      discussion: newDiscussion,
-    });
+    // Determine sort order
+    let sortQuery = {};
+    switch (sort) {
+      case 'oldest':
+        sortQuery = { createdAt: 1 };
+        break;
+      case 'mostReplies':
+        sortQuery = { 'replies.length': -1 };
+        break;
+      case 'mostLikes':
+        sortQuery = { 'likes.length': -1 };
+        break;
+      default:
+        sortQuery = { createdAt: -1 };
+    }    const discussions = await Discussion.find(query)
+      .sort(sortQuery)
+      .populate('userId', 'name avatar')
+      .populate('courseId', 'title')
+      .populate('replies.userId', 'name avatar')
+      .exec();
+
+    if (!discussions) {
+      throw new DiscussionError('Error fetching discussions', 500);
+    }
+
+    // Transform the data to include total counts
+    const response = {
+      discussions,
+      total: discussions.length,
+      hasMore: false, // You can implement pagination later
+      metadata: {
+        totalReplies: discussions.reduce((sum, disc) => sum + (disc.replies?.length || 0), 0),
+        totalLikes: discussions.reduce((sum, disc) => sum + (disc.likes?.length || 0), 0),
+      }
+    };
+
+    res.json(response);
   } catch (error) {
-    res.status(500).json({
-      message: "Error creating discussion",
-      error: error.message,
-    });
+    if (error instanceof DiscussionError) {
+      res.status(error.statusCode).json({
+        message: error.message,
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    } else {
+      errorHandler(error, req, res);
+    }
   }
 };
 
-// Update updateDiscussion and deleteDiscussion to check ownership:
-exports.updateDiscussion = async (req, res) => {
+// Get discussions by course
+exports.getDiscussionsByCourse = async (req, res) => {
   try {
-    const { content } = req.body;
-    const userId = req.user._id;
+    const { courseId } = req.params;
+    const discussions = await Discussion.find({ courseId })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'name avatar')
+      .populate('replies.userId', 'name avatar');
 
-    const discussion = await Discussion.findById(req.params.discussionId);
+    res.json({ discussions });
+  } catch (error) {
+    errorHandler(error, req, res);
+  }
+};
+
+// Get single discussion by ID
+exports.getDiscussionById = async (req, res) => {
+  try {
+    const { discussionId } = req.params;
+    const discussion = await Discussion.findById(discussionId)
+      .populate('userId', 'name avatar')
+      .populate('courseId', 'title')
+      .populate('replies.userId', 'name avatar')
+      .populate('likes', 'name avatar');
 
     if (!discussion) {
       return res.status(404).json({ message: "Discussion not found" });
     }
 
-    // Check if user is authorized to update this discussion
-    if (
-      discussion.userId.toString() !== userId.toString() &&
-      req.user.role !== "admin" &&
-      req.user.role !== "instructor"
-    ) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to update this discussion" });
+    res.json({ discussion });
+  } catch (error) {
+    errorHandler(error, req, res);
+  }
+};
+
+// Create new discussion
+exports.createDiscussion = async (req, res) => {
+  try {
+    const { courseId, title, content, tags } = req.body;
+    const userId = req.user._id;
+
+    // Validate if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
     }
 
-    discussion.content = content;
-    discussion.updatedAt = new Date();
+    const discussion = new Discussion({
+      courseId,
+      userId,
+      title,
+      content,
+      tags: tags || []
+    });
 
     await discussion.save();
 
-    res.status(200).json(discussion);
+    const populatedDiscussion = await Discussion.findById(discussion._id)
+      .populate('userId', 'name avatar')
+      .populate('courseId', 'title');
+
+    res.status(201).json({ discussion: populatedDiscussion });
   } catch (error) {
-    res.status(500).json({
-      message: "Error updating discussion",
-      error: error.message,
-    });
+    errorHandler(error, req, res);
   }
 };
 
-// Get all discussions for a specific course
-exports.getDiscussionsByCourse = async (req, res) => {
-    try {
-        const discussions = await Discussion.find({ courseId: req.params.courseId }).populate('createdBy', 'username');
-        res.status(200).json(discussions);
-    } catch (error) {
-        res.status(500).json({ message: 'Error retrieving discussions', error: error.message });
+// Update discussion
+exports.updateDiscussion = async (req, res) => {
+  try {
+    const { discussionId } = req.params;
+    const { title, content, tags } = req.body;
+    const userId = req.user._id;
+
+    const discussion = await Discussion.findOne({ _id: discussionId, userId });
+    if (!discussion) {
+      return res.status(404).json({ message: "Discussion not found or you don't have permission to update it" });
     }
+
+    discussion.title = title || discussion.title;
+    discussion.content = content || discussion.content;
+    discussion.tags = tags || discussion.tags;
+
+    await discussion.save();
+
+    const updatedDiscussion = await Discussion.findById(discussionId)
+      .populate('userId', 'name avatar')
+      .populate('courseId', 'title')
+      .populate('replies.userId', 'name avatar');
+
+    res.json({ discussion: updatedDiscussion });
+  } catch (error) {
+    errorHandler(error, req, res);
+  }
 };
 
-// Get a specific discussion by ID
-exports.getDiscussionById = async (req, res) => {
-    try {
-        const discussion = await Discussion.findById(req.params.id).populate('createdBy', 'username');
-        if (!discussion) {
-            return res.status(404).json({ message: 'Discussion not found' });
-        }
-        res.status(200).json(discussion);
-    } catch (error) {
-        res.status(500).json({ message: 'Error retrieving discussion', error: error.message });
-    }
-};
-
-// Delete a discussion
+// Delete discussion
 exports.deleteDiscussion = async (req, res) => {
   try {
-    const discussion = await Discussion.findById(req.params.discussionId);
+    const { discussionId } = req.params;
+    const userId = req.user._id;
 
+    const discussion = await Discussion.findOne({ _id: discussionId, userId });
+    if (!discussion) {
+      return res.status(404).json({ message: "Discussion not found or you don't have permission to delete it" });
+    }
+
+    await discussion.deleteOne();
+    res.json({ message: "Discussion deleted successfully" });
+  } catch (error) {
+    errorHandler(error, req, res);
+  }
+};
+
+// Add reply to discussion
+exports.addReply = async (req, res) => {
+  try {
+    const { discussionId } = req.params;
+    const { content } = req.body;
+    const userId = req.user._id;
+
+    if (!content) {
+      return res.status(400).json({ message: "Reply content is required" });
+    }
+
+    const discussion = await Discussion.findById(discussionId);
     if (!discussion) {
       return res.status(404).json({ message: "Discussion not found" });
     }
 
-    // Optional: Check if user is authorized to delete this discussion
-    // if (discussion.createdBy.toString() !== req.user.id) {
-    //     return res.status(403).json({ message: 'Not authorized to delete this discussion' });
-    // }
+    const reply = {
+      userId,
+      content,
+      createdAt: Date.now()
+    };
 
-    await Discussion.findByIdAndDelete(req.params.discussionId);
+    discussion.replies.push(reply);
+    await discussion.save();
 
-    res.status(200).json({ message: "Discussion deleted successfully" });
+    const populatedDiscussion = await Discussion.findById(discussionId)
+      .populate('userId', 'name avatar')
+      .populate('replies.userId', 'name avatar');
+
+    const newReply = populatedDiscussion.replies[populatedDiscussion.replies.length - 1];
+
+    res.status(201).json({ reply: newReply });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error deleting discussion", error: error.message });
+    errorHandler(error, req, res);
+  }
+};
+
+// Toggle like on discussion
+exports.toggleLike = async (req, res) => {
+  try {
+    const { discussionId } = req.params;
+    const userId = req.user._id;
+
+    const discussion = await Discussion.findById(discussionId);
+    if (!discussion) {
+      return res.status(404).json({ message: "Discussion not found" });
+    }
+
+    const userLikeIndex = discussion.likes.indexOf(userId);
+    
+    if (userLikeIndex === -1) {
+      // User hasn't liked the discussion yet, add like
+      discussion.likes.push(userId);
+    } else {
+      // User already liked the discussion, remove like
+      discussion.likes.splice(userLikeIndex, 1);
+    }
+
+    await discussion.save();
+    
+    const updatedDiscussion = await Discussion.findById(discussionId)
+      .populate('likes', 'name avatar');
+    
+    res.json({ likes: updatedDiscussion.likes });
+  } catch (error) {
+    errorHandler(error, req, res);
+  }
+};
+
+// Delete reply from discussion
+exports.deleteReply = async (req, res) => {
+  try {
+    const { discussionId, replyId } = req.params;
+    const userId = req.user._id;
+
+    const discussion = await Discussion.findById(discussionId);
+    if (!discussion) {
+      return res.status(404).json({ message: "Discussion not found" });
+    }
+
+    // Find the reply
+    const replyIndex = discussion.replies.findIndex(reply => 
+      reply._id.toString() === replyId && reply.userId.toString() === userId.toString()
+    );
+
+    if (replyIndex === -1) {
+      return res.status(404).json({ message: "Reply not found or you don't have permission to delete it" });
+    }
+
+    // Remove the reply
+    discussion.replies.splice(replyIndex, 1);
+    await discussion.save();
+
+    res.json({ message: "Reply deleted successfully" });
+  } catch (error) {
+    errorHandler(error, req, res);
   }
 };
