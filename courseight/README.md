@@ -1,3 +1,10 @@
+# Group Member
+
+1. Muhammad Sesarafli Aljagra 2206828071
+2. Adhi Rajasa Rafif 2306266943
+3. Gerrardin Nabil Zulhian 2306250661
+4. Dimas Ananda Sutiardi 2306250586
+
 # CourseEight
 
 CourseEight is a comprehensive e-learning platform designed to facilitate online education through interactive courses, assessments, and discussions. The platform serves three main user roles: Students, Instructors, and Administrators.
