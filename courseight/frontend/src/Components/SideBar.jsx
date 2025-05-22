@@ -81,11 +81,11 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
         ></div>
       )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed z-50 inset-y-0 left-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:shadow-none lg:translate-x-0 ${
+      {/* Sidebar */}      <aside
+        id="sidebar"
+        className={`fixed top-16 left-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:shadow-none lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:static lg:w-64 lg:flex-shrink-0 flex flex-col h-full overflow-hidden`}
+        } lg:static lg:w-64 lg:flex-shrink-0 flex flex-col h-[calc(100vh-4rem)] overflow-y-auto`}
       >
         <div className="flex items-center justify-between p-4 border-b">
           <span className="font-bold text-lg text-indigo-600">
