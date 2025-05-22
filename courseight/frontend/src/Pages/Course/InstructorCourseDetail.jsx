@@ -57,8 +57,14 @@ const InstructorCourseDetail = () => {
         // Fetch course details
         const courseData = await courseAPI.getCourseById(id);
 
+        // Get instructor ID regardless of format
+        const instructorId =
+          typeof courseData.instructor === "object"
+            ? courseData.instructor._id?.toString()
+            : courseData.instructor?.toString();
+
         // Check if user is the instructor of this course
-        if (courseData.instructor !== user.id && user.role !== "admin") {
+        if (instructorId !== user.id?.toString() && user.role !== "admin") {
           toast.error("You don't have permission to view this course");
           navigate("/instructor/courses");
           return;

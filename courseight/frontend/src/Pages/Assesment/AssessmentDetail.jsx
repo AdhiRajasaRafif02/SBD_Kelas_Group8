@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../Contexts/AuthContext";
-import { assessmentAPI, progressAPI } from "../Services/serviceApi";
+import { assessmentAPI, progressAPI, courseAPI } from "../Services/serviceApi"; // Add courseAPI
 import { FiClock, FiAlertTriangle, FiArrowLeft } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -15,6 +15,8 @@ const AssessmentDetail = () => {
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [course, setCourse] = useState(null); // Add this line
 
   useEffect(() => {
     const fetchAssessmentData = async () => {
@@ -24,6 +26,17 @@ const AssessmentDetail = () => {
         // Fetch assessment data
         const data = await assessmentAPI.getAssessmentById(id);
         setAssessment(data);
+
+        // Fetch course data if courseId exists
+        if (data.courseId) {
+          try {
+            const courseData = await courseAPI.getCourseById(data.courseId);
+            setCourse(courseData);
+          } catch (err) {
+            console.error("Error fetching course details:", err);
+            // Non-critical error, continue with assessment
+          }
+        }
 
         // Initialize time limit
         if (data.timeLimit) {
@@ -113,17 +126,22 @@ const AssessmentDetail = () => {
     try {
       setSubmitting(true);
 
-      // Format answer data
-      const answerData = Object.entries(answers).map(
-        ([questionId, answer]) => ({
-          questionId,
-          answer,
-        })
-      );
+      // Convert the answers object to the expected format
+      // The backend expects answers indexed by position, not by question ID
+      const orderedAnswers = [];
+
+      assessment.questions.forEach((question, index) => {
+        // Find the answer for this question
+        const questionId = question._id;
+        const answer = answers[questionId] || "";
+        orderedAnswers.push(answer);
+      });
+
+      console.log("Submitting answers:", orderedAnswers);
 
       // Submit assessment
       const result = await assessmentAPI.submitAssessment(id, {
-        answers: answerData,
+        answers: orderedAnswers,
       });
 
       // Update progress for the course
@@ -155,6 +173,18 @@ const AssessmentDetail = () => {
     return `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
+  };
+
+  // Add this function if it doesn't exist
+  const navigateQuestion = (direction) => {
+    if (
+      direction === "next" &&
+      currentQuestion < assessment.questions.length - 1
+    ) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else if (direction === "prev" && currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    }
   };
 
   if (loading) {

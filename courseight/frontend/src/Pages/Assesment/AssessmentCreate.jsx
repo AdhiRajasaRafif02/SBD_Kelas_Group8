@@ -166,23 +166,10 @@ const AssessmentCreate = () => {
     try {
       setSaving(true);
 
-      // Create assessment
+      // Create assessment - courseId is already included in formData
       const assessment = await assessmentAPI.createAssessment(formData);
 
-      // Link assessment to course if not already linked
-      if (assessment && formData.courseId) {
-        try {
-          await courseAPI.linkAssessmentToCourse(
-            formData.courseId,
-            assessment._id
-          );
-        } catch (err) {
-          console.error("Error linking assessment to course:", err);
-          toast.error(
-            "Assessment created but couldn't be linked to the course"
-          );
-        }
-      }
+      // No need for separate linking step
 
       toast.success("Assessment created successfully");
 

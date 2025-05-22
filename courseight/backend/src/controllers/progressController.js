@@ -1,4 +1,6 @@
 const Progress = require("../models/Progress");
+const Assessment = require("../models/Assessment");
+const mongoose = require("mongoose");
 
 // Get user progress for a specific course
 exports.getUserProgress = async (req, res) => {
@@ -69,21 +71,56 @@ exports.getCourseRanking = async (req, res) => {
   try {
     const { courseId } = req.params;
     const Progress = require("../models/Progress");
+    const Assessment = require("../models/Assessment");
 
-    // Find all progress records for this course and sort by progressPercentage
-    const rankings = await Progress.find({ courseId })
+    // First, get the basic progress data
+    const progressData = await Progress.find({ courseId })
       .sort({ progressPercentage: -1 })
       .populate("userId", "username email")
       .select("userId progressPercentage lastUpdated");
 
-    if (rankings.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No progress data found for this course" });
-    }
+    // Get all assessments for this course with their results
+    const assessments = await Assessment.find({ courseId }).lean();
 
-    res.status(200).json(rankings);
+    // Create a map to store user scores
+    const userScores = {};
+
+    // Process all assessment results
+    assessments.forEach((assessment) => {
+      if (assessment.results && Array.isArray(assessment.results)) {
+        assessment.results.forEach((result) => {
+          if (result.userId && result.score) {
+            const userId = result.userId.toString();
+            if (!userScores[userId]) {
+              userScores[userId] = {
+                totalScore: 0,
+                count: 0,
+              };
+            }
+            userScores[userId].totalScore += result.score;
+            userScores[userId].count += 1;
+          }
+        });
+      }
+    });
+
+    // Add average scores to progress data
+    const enhancedRankings = progressData.map((progress) => {
+      const userId = progress.userId._id.toString();
+      const userScore = userScores[userId];
+      const averageScore = userScore
+        ? userScore.totalScore / userScore.count
+        : 0;
+
+      return {
+        ...progress.toObject(),
+        averageScore: averageScore,
+      };
+    });
+
+    res.status(200).json(enhancedRankings);
   } catch (error) {
+    console.error("Error in getCourseRanking:", error);
     res.status(500).json({ message: error.message });
   }
 };

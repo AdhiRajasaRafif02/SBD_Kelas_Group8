@@ -27,4 +27,11 @@ router.delete('/:id', courseController.deleteCourse);
 // Route to enroll a user in a course
 router.post("/:courseId/enroll", authMiddleware, courseController.enrollInCourse);
 
+// Route to post a course assessment
+router.post(
+  "/:courseId/assessments/:assessmentId",
+  authMiddleware,
+  courseController.addAssessmentToCourse
+);
+
 module.exports = router;

@@ -129,6 +129,7 @@ const CourseDetail = () => {
         try {
           const leaderboardData = await progressAPI.getCourseRanking(id);
           setLeaderboard(leaderboardData || []);
+          console.log("Leaderboard data:", leaderboardData);
         } catch (err) {
           console.error("Error fetching leaderboard:", err);
           setLeaderboard([]);
@@ -603,7 +604,9 @@ const CourseDetail = () => {
                           <div className="flex items-center">
                             <FiStar className="mr-1 text-yellow-400" />
                             <span className="text-sm font-medium text-gray-900">
-                              {Math.round(entry.averageScore || 0)}%
+                              {entry.averageScore
+                                ? `${Math.round(entry.averageScore)}%`
+                                : "N/A"}
                             </span>
                           </div>
                         </td>

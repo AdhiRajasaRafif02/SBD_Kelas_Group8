@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=mongodb+srv://kelompok8:sbd01@nosql08.4nzlcdv.mongodb.net/courseight
+      - SESSION_SECRET=your_secure_random_string
+      - CORS_ORIGIN=http://localhost:5173
+    restart: unless-stopped
+    
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend
+    restart: unless-stopped

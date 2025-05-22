@@ -248,33 +248,29 @@ export const assessmentAPI = {
 
   createAssessment: async (assessmentData) => {
     try {
-      // Transform the data to match backend expectations
-      const transformedData = {
-        title: assessmentData.title,
-        description: assessmentData.description,
-        courseId: assessmentData.courseId,
-        timeLimit: assessmentData.timeLimit,
-        passingMarks: assessmentData.passingMarks,
-        totalMarks: assessmentData.questions.reduce(
-          (sum, q) => sum + (q.points || 10),
-          0
-        ), // Calculate total marks
+      // Calculate total marks based on question points
+      const totalMarks = assessmentData.questions.reduce(
+        (sum, question) => sum + (question.points || 10),
+        0
+      );
 
-        questions: assessmentData.questions.map((question) => {
-          // Convert each question to match backend schema
-          return {
-            questionText: question.question, // Map "question" to "questionText"
-            options: question.options.map((optText, index) => {
-              return {
-                optionText: optText,
-                isCorrect: index === question.correctAnswer, // Set isCorrect based on correctAnswer index
-              };
-            }),
-          };
-        }),
+      // Transform the data to match backend schema
+      const transformedData = {
+        ...assessmentData,
+        totalMarks: totalMarks,
+        questions: assessmentData.questions.map((question) => ({
+          questionText: question.question,
+          options: question.options.map((option, index) => ({
+            optionText: option,
+            isCorrect: index === question.correctAnswer,
+          })),
+        })),
       };
 
-      console.log("Sending transformed assessment data:", transformedData);
+      console.log(
+        "Creating assessment with transformed data:",
+        transformedData
+      );
       const response = await api.post("/assessments", transformedData);
       return response.data;
     } catch (error) {
@@ -307,11 +303,32 @@ export const assessmentAPI = {
     }
   },
 
-  submitAssessment: async (assessmentId, answerData) => {
+  submitAssessment: async (assessmentId, data) => {
     try {
+      // Transform data format to match backend expectations
+      let transformedData = data;
+
+      if (
+        data.answers &&
+        Array.isArray(data.answers) &&
+        data.answers[0]?.questionId
+      ) {
+        // Convert from [{questionId, answer}] to simple array format
+        const assessment = await api.get(`/assessments/${assessmentId}`);
+        const questions = assessment.data.questions;
+
+        // Create array of answers matching the question order
+        const simpleAnswers = questions.map((q) => {
+          const answerObj = data.answers.find((a) => a.questionId === q._id);
+          return answerObj ? answerObj.answer : "";
+        });
+
+        transformedData = { answers: simpleAnswers };
+      }
+
       const response = await api.post(
         `/assessments/${assessmentId}/submit`,
-        answerData
+        transformedData
       );
       return response.data;
     } catch (error) {

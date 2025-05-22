@@ -164,3 +164,40 @@ exports.enrollInCourse = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Add this function to courseController.js
+exports.addAssessmentToCourse = async (req, res) => {
+  try {
+    const { courseId, assessmentId } = req.params;
+
+    // Find the course
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // Check if assessment already exists in the course
+    if (course.assessments && course.assessments.includes(assessmentId)) {
+      return res
+        .status(200)
+        .json({ message: "Assessment already linked to course" });
+    }
+
+    // Add assessment to course
+    course.assessments = course.assessments || [];
+    course.assessments.push(assessmentId);
+
+    // Update assessment with courseId if it doesn't have one
+    const Assessment = require("../models/Assessment");
+    await Assessment.findByIdAndUpdate(
+      assessmentId,
+      { courseId: courseId },
+      { new: true }
+    );
+
+    await course.save();
+    res.status(200).json(course);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
