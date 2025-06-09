@@ -129,6 +129,12 @@ After the seeder completes, you can log in with these accounts:
 - **Password:** student123
 - **Features:** Enroll in courses, take assessments, join discussions
 
+### Additional student accounts:
+
+- jane@courseight.com / student123
+- bob@courseight.com / student123
+- alice@courseight.com / student123
+
 ## 📚 Demo Content
 
 The application automatically loads with:
