@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+    networks:
+      - courseight-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: sesarafli/courseight-backend:latest
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/courseight?authSource=admin
+      - SESSION_SECRET=${SESSION_SECRET:-courseight_secret_key_2024}
+      - CORS_ORIGIN=http://localhost:5173
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - courseight-network
+    restart: unless-stopped
+
+  # Service untuk menjalankan seeder
+  seeder:
+    image: sesarafli/courseight-backend:latest
+    environment:
+      - DATABASE_URL=mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/courseight?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - courseight-network
+    command: npm run seed
+    restart: "no"
+    
+  frontend:
+    image: sesarafli/courseight-frontend:latest
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - courseight-network
+    restart: unless-stopped
+
+networks:
+  courseight-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
