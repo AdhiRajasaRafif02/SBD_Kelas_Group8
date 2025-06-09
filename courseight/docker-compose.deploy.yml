@@ -35,7 +35,6 @@ services:
       - courseight-network
     restart: unless-stopped
 
-  # Service untuk menjalankan seeder
   seeder:
     image: sesarafli/courseight-backend:latest
     environment:
