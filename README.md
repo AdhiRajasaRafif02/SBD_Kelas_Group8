@@ -83,11 +83,14 @@ Our application uses MongoDB with the following main collections:
 - Docker Desktop installed and running
 - Internet connection
 
-### One Command Setup
+## One Command Setup
+
 ```bash
 # Download and run CourseEight
-curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/master/docker-compose.deploy.yml && docker-compose -f docker-compose.deploy.yml up -d
+curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/master/courseight/docker-compose.deploy.yml && docker-compose -f docker-compose.deploy.yml up -d
 ```
+#### Access the application
+<http://localhost:5173>
 
 ### Manual Setup
 ```bash
