@@ -77,25 +77,22 @@ Our application uses MongoDB with the following main collections:
    - Threaded conversations
    - Announcement system
 
-# 🚀 Quick Start with Docker
+## 🚀 Quick Start with Docker
 
-## Prerequisites
-
+### Prerequisites
 - Docker Desktop installed and running
 - Internet connection
 
-## One Command Setup
-
+### One Command Setup
 ```bash
 # Download and run CourseEight
-curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/main/courseight/docker-compose.deploy.yml && docker-compose -f docker-compose.deploy.yml up -d
+curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/master/docker-compose.deploy.yml && docker-compose -f docker-compose.deploy.yml up -d
 ```
 
-## Manual Setup
-
+### Manual Setup
 ```bash
 # 1. Download deployment file
-curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/main/courseight/docker-compose.deploy.yml
+curl -O https://raw.githubusercontent.com/AdhiRajasaRafif02/SBD_Kelas_Group8/master/docker-compose.deploy.yml
 
 # 2. Start the application
 docker-compose -f docker-compose.deploy.yml up -d
@@ -107,7 +104,6 @@ docker-compose -f docker-compose.deploy.yml logs seeder
 # Frontend: http://localhost:5173
 # Backend API: http://localhost:5000/api
 ```
-
 ## 🔑 Demo Accounts
 
 After the seeder completes, you can log in with these accounts:
